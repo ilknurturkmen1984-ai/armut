@@ -131,14 +131,27 @@ details.ac[open] summary::after{transform:rotate(90deg)}
 <script>
 'use strict';
 /* =========================================================
-   ARMUT · Aile bütçesi (gelir / gider)
-   Veri: tarayıcıda + (isteğe bağlı) GitHub deposunda ŞİFRELİ dosya
+   ARMUT · Aile bütçesi (gelir / gider / ödemeler)
+   Veri: cihazda + Google Drive (Armut klasörü) — YKS-LGS Takip ile aynı düzen
+   Yönetici: Google ile bağlanır, kayıt girer (telefon + PC)
+   İzleyici: ?izle=DOSYA_ID&k=API_ANAHTARI bağlantısıyla salt okunur görür
    ========================================================= */
-const VER = '1.0.0';
-const LS_DB = 'armut_db', LS_CFG = 'armut_cfg';
+const VER = '2.0.0';
+const GCID = '152062296588-5bob25d2nfpagn253upfpnor8gdd0lo0.apps.googleusercontent.com';
+const GSCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DFOLD = 'Armut', DFILE = 'armut_veri.json';
+const GAPI = 'https://www.googleapis.com/drive/v3/files', GUP = 'https://www.googleapis.com/upload/drive/v3/files';
+const LS_DB = 'armut_db', LS_CFG = 'armut_cfg', LS_TOK = 'armut_gtok', LS_VIEW = 'armut_viewer';
 const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const AYK = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
 const ODEME = ['Kredi Kartı','Banka','Nakit','Avans Hesap'];
+const PTIP = {
+  sabit:  ['Aylık sabit gider','📅'],
+  taksit: ['Kredi kartı taksiti','💳'],
+  kredi:  ['Banka kredisi','🏦'],
+  kurs:   ['Kurs / okul ücreti','🎓'],
+  yillik: ['Yılda bir/iki kez','🗓️']
+};
 
 const VARSAYILAN_KAT = [
   ['online-market','Online Market','🛒','gider'],['market','Bakkal / Market','🥖','gider'],
@@ -147,30 +160,27 @@ const VARSAYILAN_KAT = [
   ['kredi','Kredi & Borç','🏦','gider'],['egitim','Eğitim','📚','gider'],
   ['saglik','Bakım / Sağlık','💊','gider'],['ev','Ev / Dekorasyon','🛋️','gider'],
   ['giyim','Giyim','👕','gider'],['ulasim','Ulaşım','🚗','gider'],
-  ['harclik','Harçlık / Para Transferi','👛','gider'],['sans','Şans Oyunu','🎲','gider'],
+  ['harclik','Harçlık','👛','gider'],['sans','Şans Oyunu','🎲','gider'],
   ['alkol','Alkol / Butik','🍷','gider'],['diger','Diğer','📦','gider'],
   ['maas','Maaş','💼','gelir'],['ek-gelir','Ek Gelir','✨','gelir'],
   ['tahsilat','Alacak Tahsilatı','🤝','gelir'],['gelir-diger','Diğer Gelir','➕','gelir']
 ];
-const VARSAYILAN_SABIT = [
-  ['Site Aidatı','konut',500],['Elektrik','fatura',0],['Su','fatura',0],['Doğalgaz','fatura',0],['İnternet','fatura',0],
-  ['Cem Cep','fatura',267],['İlknur Cep','fatura',235],['Umut Cem Cep','fatura',0],['Arya Cep','fatura',0],['Mehri Cep','fatura',0],
-  ['Spotify','fatura',165],['Denizbank Kredi','kredi',12826.79],['Arya Deneme Kulübü','egitim',5000]
-];
-const VARSAYILAN_KURAL = [
-  ['MIGROS','online-market'],['GETIR','online-market'],['CARREFOUR','online-market'],['A101 EKSTRA','online-market'],['HEPSIEXPRESS','online-market'],
-  ['A101','market'],['SOK','market'],['BIM ','market'],['MARKET','market'],['TEKEL','market'],['TEKEL BUFE','sans'],
-  ['YEMEKPAY','online-yemek'],['YEMEKSEPETI','online-yemek'],['TRENDYOL YEMEK','online-yemek'],
-  ['PASTA','kafe'],['UNLU MAMUL','kafe'],['KAHVE','kafe'],['BURGER','kafe'],['PIZZA','kafe'],['BOREK','kafe'],['KAFE','kafe'],['KOFTECI','kafe'],['WAFFLE','kafe'],['KURUYEMIS','kafe'],['RESTORAN','kafe'],
-  ['TREDAS','fatura'],['TEKRDS','fatura'],['TURKST','fatura'],['VODAFONE','fatura'],['TURKCELL','fatura'],['SPOTIFY','fatura'],['TRBLDG','fatura'],
-  ['SITE YON','konut'],['KENTKUR','konut'],
-  ['KREDILI HESAP FAIZ','kredi'],['KESINTI VE EKLERI','diger'],
-  ['KIRTASIYE','egitim'],['KITABEVI','egitim'],['KITAPEVI','egitim'],['DR.COM','egitim'],['BKMKITAP','egitim'],['DENEME UCRETI','egitim'],
-  ['GRATIS','saglik'],['ECZANE','saglik'],['WATSONS','saglik'],['ROSSMANN','saglik'],
-  ['TEKNOSA','ev'],['MEDIA SATURN','ev'],['NALBUR','ev'],['HEPSIBURADA','ev'],['HEPSIPAY','ev'],['TRENDYOL.COM','ev'],['ARZUM','ev'],['IKEA','ev'],['KOCTAS','ev'],
-  ['BELBIM','ulasim'],['TOPLU TASIMA','ulasim'],['PETROL','ulasim'],['OPET','ulasim'],['SHELL','ulasim'],['OTOPARK','ulasim'],['GARENTA','ulasim'],['OBILET','ulasim'],['/ASIS','ulasim'],
-  ['BILYONER','sans'],['MISLI','sans'],['NESINE','sans'],
-  ['BUTIKBIRA','alkol'],['FAST-CEP','harclik']
+// Açıklama yazarken kategoriyi kendiliğinden seçmek için
+const KURAL = [
+  ['MIGROS','online-market'],['GETIR','online-market'],['CARREFOUR','online-market'],['HEPSIEXPRESS','online-market'],
+  ['A101','market'],['SOK','market'],['BIM','market'],['MARKET','market'],['BAKKAL','market'],
+  ['YEMEKSEPETI','online-yemek'],['YEMEK SEPETI','online-yemek'],['TRENDYOL YEMEK','online-yemek'],
+  ['PASTA','kafe'],['KAHVE','kafe'],['BURGER','kafe'],['PIZZA','kafe'],['BOREK','kafe'],['KAFE','kafe'],['KOFTE','kafe'],['RESTORAN','kafe'],['KURUYEMIS','kafe'],
+  ['ELEKTRIK','fatura'],['SU FATURA','fatura'],['DOGALGAZ','fatura'],['INTERNET','fatura'],['TELEFON','fatura'],['VODAFONE','fatura'],['TURKCELL','fatura'],['SPOTIFY','fatura'],
+  ['AIDAT','konut'],['DASK','konut'],['EMLAK','konut'],
+  ['KREDI','kredi'],
+  ['KIRTASIYE','egitim'],['KITAP','egitim'],['DERSHANE','egitim'],['KURS','egitim'],['DENEME','egitim'],['OKUL','egitim'],
+  ['ECZANE','saglik'],['GRATIS','saglik'],['WATSONS','saglik'],['DOKTOR','saglik'],['HASTANE','saglik'],
+  ['TEKNOSA','ev'],['MEDIA','ev'],['NALBUR','ev'],['IKEA','ev'],['KOCTAS','ev'],['HEPSIBURADA','ev'],['TRENDYOL','ev'],
+  ['LCW','giyim'],['DEFACTO','giyim'],['KOTON','giyim'],['AYAKKABI','giyim'],
+  ['BENZIN','ulasim'],['AKARYAKIT','ulasim'],['PETROL','ulasim'],['OTOPARK','ulasim'],['TOPLU TASIMA','ulasim'],['OTOBUS','ulasim'],['TAKSI','ulasim'],
+  ['BILYONER','sans'],['IDDAA','sans'],['LOTO','sans'],['PIYANGO','sans'],
+  ['BIRA','alkol'],['SARAP','alkol'],['RAKI','alkol'],['MAAS','maas']
 ];
 
 /* ---------- yardımcılar ---------- */
@@ -181,12 +191,13 @@ const uid = () => now().toString(36) + Math.random().toString(36).slice(2, 7);
 const nf = new Intl.NumberFormat('tr-TR', {minimumFractionDigits:0, maximumFractionDigits:2});
 const nf2 = new Intl.NumberFormat('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2});
 const TL = v => nf.format(Math.round((v||0)*100)/100) + ' ₺';
-const TLk = v => { const a = Math.abs(v); return a >= 100000 ? nf.format(Math.round(v/1000)) + ' B₺' : TL(v); };
+const TLk = v => Math.abs(v) >= 100000 ? nf.format(Math.round(v/1000)) + ' B₺' : TL(v);
 const pad = n => String(n).padStart(2, '0');
 const iso = d => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
 const today = () => iso(new Date());
 const trUp = s => String(s||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/Ş/g,'S').replace(/Ğ/g,'G').replace(/Ü/g,'U').replace(/Ö/g,'O').replace(/Ç/g,'C');
 const fmtDate = s => { const [y,m,d] = s.split('-'); return +d + ' ' + AYK[+m-1] + ' ' + y; };
+const ayAd = k => AYK[+k.slice(5)-1] + ' ' + k.slice(0,4);
 const parseAmt = s => {
   s = String(s ?? '').replace(/[₺\s]|TL/gi, '');
   if (!s) return NaN;
@@ -196,46 +207,65 @@ const parseAmt = s => {
   else if ((s.match(/\./g)||[]).length > 1) s = s.replace(/\./g,'');
   return parseFloat(s);
 };
-function toast(msg, ms=2400){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+function toast(msg, ms=2400){ document.querySelectorAll('.toast').forEach(t=>t.remove()); const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+
+/* ---------- izleyici bağlantısı (YKS-LGS ile aynı: ?izle=ID&k=ANAHTAR) ---------- */
+let VIEWER = null;
+(() => {
+  const q = new URLSearchParams(location.search), id = q.get('izle'), k = q.get('k');
+  if (id && k){ VIEWER = {id, k}; localStorage.setItem(LS_VIEW, JSON.stringify(VIEWER)); }
+  else { try { VIEWER = JSON.parse(localStorage.getItem(LS_VIEW) || 'null'); } catch(e){} }
+  if (VIEWER){ // ana ekrana eklenince de izleyici olarak açılsın
+    const base = location.origin + location.pathname.replace(/index\.html$/, '');
+    const man = {name:'Armut · Aile Bütçesi', short_name:'Armut', lang:'tr', display:'standalone', background_color:'#FBF8EF', theme_color:'#7FA62A',
+      start_url: base + '?izle=' + encodeURIComponent(VIEWER.id) + '&k=' + encodeURIComponent(VIEWER.k), scope: base,
+      icons:[{src:base+'icons/icon-192.png',sizes:'192x192',type:'image/png'},{src:base+'icons/icon-512.png',sizes:'512x512',type:'image/png'},{src:base+'icons/icon-maskable-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}]};
+    const l = document.querySelector('link[rel=manifest]'); if (l) l.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man));
+  }
+})();
+const isAdmin = () => !VIEWER;
 
 /* ---------- veri ---------- */
 function bosDB(){
   const t = now();
-  return {
-    v:1,
+  return { v:2,
     ayar:{donemGun:1, butce:0, kisiler:['Ortak','İlknur','Cem','Umut Cem','Arya'], u:t},
     kategoriler: VARSAYILAN_KAT.map(([id,ad,ikon,tur]) => ({id,ad,ikon,tur,u:t})),
-    sabitler: VARSAYILAN_SABIT.map(([ad,kat,tutar]) => ({id:uid(),ad,kat,tutar,u:t})),
-    kurallar: VARSAYILAN_KURAL.map(([k,kat]) => ({id:uid(),k,kat,u:t})),
-    islemler: [], durum: []
-  };
+    planlar: [], islemler: [], durum: [] };
 }
-let db = (() => { try { return JSON.parse(localStorage.getItem(LS_DB)) || null; } catch(e){ return null; } })();
+function uyumla(d){ // eski sürüm verisini tamamla
+  if (!d) return d;
+  const b = bosDB();
+  d.ayar = d.ayar || b.ayar; d.kategoriler = d.kategoriler || b.kategoriler;
+  d.planlar = d.planlar || []; d.islemler = d.islemler || []; d.durum = d.durum || [];
+  return d;
+}
+let db = uyumla((() => { try { return JSON.parse(localStorage.getItem(LS_DB)); } catch(e){ return null; } })()) || bosDB();
 let cfg = (() => { try { return JSON.parse(localStorage.getItem(LS_CFG)) || {}; } catch(e){ return {}; } })();
 const saveLocal = () => localStorage.setItem(LS_DB, JSON.stringify(db));
 const saveCfg = () => localStorage.setItem(LS_CFG, JSON.stringify(cfg));
 const live = arr => (arr||[]).filter(x => !x.del);
-const isAdmin = () => cfg.rol === 'admin';
 const kat = id => db.kategoriler.find(k => k.id === id) || {id, ad: id || 'Diğer', ikon:'📦', tur:'gider'};
 
-function degisti(){ db.v = 1; saveLocal(); render(); if (isAdmin() && syncAktif()) planlaGonder(); }
+function degisti(){ saveLocal(); render(); if (isAdmin()){ cfg.bekleyen = true; saveCfg(); planlaGonder(); } }
 function upsert(list, obj){ obj.u = now(); const i = db[list].findIndex(x => x.id === obj.id); if (i > -1) db[list][i] = obj; else db[list].push(obj); }
 function sil(list, id){ const x = db[list].find(x => x.id === id); if (x){ x.del = true; x.u = now(); } }
 
 function birlestir(a, b){
-  if (!a) return b; if (!b) return a;
-  const out = {v:1, ayar: (b.ayar?.u||0) > (a.ayar?.u||0) ? b.ayar : a.ayar};
-  for (const k of ['kategoriler','sabitler','kurallar','islemler','durum']){
+  if (!a) return uyumla(b); if (!b) return a;
+  a = uyumla(a); b = uyumla(b);
+  const out = {v:2, ayar: (b.ayar?.u||0) > (a.ayar?.u||0) ? b.ayar : a.ayar};
+  for (const k of ['kategoriler','planlar','islemler','durum']){
     const m = new Map();
-    for (const x of (a[k]||[])) m.set(x.id, x);
-    for (const x of (b[k]||[])){ const y = m.get(x.id); if (!y || (x.u||0) > (y.u||0)) m.set(x.id, x); }
+    for (const x of a[k]) m.set(x.id, x);
+    for (const x of b[k]){ const y = m.get(x.id); if (!y || (x.u||0) > (y.u||0)) m.set(x.id, x); }
     out[k] = [...m.values()];
   }
   return out;
 }
 
 /* ---------- dönem ---------- */
-let secili = null; // {y, m}  (m: 0-11)
+let secili = null; // {y, m}  m: 0-11
 function donemOf(dateStr){
   const d = new Date(dateStr + 'T12:00:00'), g = db.ayar.donemGun || 1;
   let y = d.getFullYear(), m = d.getMonth();
@@ -249,122 +279,182 @@ function donemAralik(p){
 }
 function donemAd(p){
   if ((db.ayar.donemGun||1) === 1) return AYLAR[p.m] + ' ' + p.y;
-  const [s,e] = donemAralik(p);
-  const f = x => { const [y,m,d] = x.split('-'); return +d + ' ' + AYK[+m-1]; };
+  const [s,e] = donemAralik(p), f = x => { const [,m,d] = x.split('-'); return +d + ' ' + AYK[+m-1]; };
   return f(s) + ' – ' + f(e) + ' ' + e.slice(0,4);
 }
 const kaydir = (p, n) => { const d = new Date(p.y, p.m + n, 1); return {y:d.getFullYear(), m:d.getMonth()}; };
-function islemlerArasi(s, e){ return live(db.islemler).filter(x => x.t >= s && x.t <= e); }
-function ozet(list){
-  let gelir = 0, gider = 0;
-  for (const x of list){ if (x.tur === 'gelir') gelir += +x.tutar; else gider += +x.tutar; }
-  return {gelir, gider, net: gelir - gider};
+const ayKey = p => p.y + '-' + pad(p.m+1);
+const keyP = k => ({y:+k.slice(0,4), m:+k.slice(5)-1});
+const islemlerArasi = (s, e) => live(db.islemler).filter(x => x.t >= s && x.t <= e);
+function ozet(list){ let gelir = 0, gider = 0; for (const x of list){ if (x.tur === 'gelir') gelir += +x.tutar; else gider += +x.tutar; } return {gelir, gider, net: gelir - gider}; }
+function katDagilim(list, tur='gider'){ const m = {}; for (const x of list) if (x.tur === tur) m[x.kat] = (m[x.kat]||0) + +x.tutar;
+  return Object.entries(m).filter(([,v]) => Math.abs(v) > 0.004).sort((a,b) => b[1]-a[1]); }
+
+/* ---------- ödeme planları ---------- */
+function planAktif(pl, key){
+  if (pl.del) return false;
+  if (pl.bas && key < pl.bas) return false;
+  if (pl.bit && key > pl.bit) return false;
+  if (pl.tip === 'yillik' && pl.aylar?.length && !pl.aylar.includes(+key.slice(5))) return false;
+  return true;
 }
-function katDagilim(list, tur='gider'){
-  const m = {};
-  for (const x of list) if (x.tur === tur) m[x.kat] = (m[x.kat]||0) + +x.tutar;
-  return Object.entries(m).filter(([,v]) => Math.abs(v) > 0.004).sort((a,b) => b[1]-a[1]);
+const planOdeme = (pl, key) => live(db.islemler).find(x => x.plan === pl.id && x.ay === key);
+function planSira(pl, key){ // kaçıncı taksit / toplam
+  if (!pl.bas || !pl.bit || pl.tip === 'sabit' || pl.tip === 'yillik') return '';
+  const say = (a, b) => (+b.slice(0,4) - +a.slice(0,4)) * 12 + (+b.slice(5) - +a.slice(5)) + 1;
+  return say(pl.bas, key) + '/' + say(pl.bas, pl.bit);
+}
+function planKalan(pl, key){ // bu ay dahil ödenmemiş taksitler
+  if (!pl.bit) return null;
+  let n = 0, tutar = 0, p = keyP(key < (pl.bas||key) ? pl.bas : key);
+  for (let i = 0; i < 360; i++){ const k = ayKey(p); if (k > pl.bit) break;
+    if (planAktif(pl, k) && !planOdeme(pl, k)){ n++; tutar += +pl.tutar || 0; } p = kaydir(p, 1); }
+  return {n, tutar};
+}
+function sonTutar(pl){ const o = live(db.islemler).filter(x => x.plan === pl.id).sort((a,b) => a.ay > b.ay ? -1 : 1)[0]; return o ? Math.abs(o.tutar) : (+pl.tutar || 0); }
+function buAyPlanlar(key){
+  return live(db.planlar).filter(pl => planAktif(pl, key)).map(pl => ({pl, od: planOdeme(pl, key), tahmin: sonTutar(pl)}))
+    .sort((a,b) => (!!a.od - !!b.od) || a.pl.ad.localeCompare(b.pl.ad, 'tr'));
 }
 
-/* ---------- GitHub senkron (açık JSON, YKS-LGS gibi) ---------- */
-const b64 = buf => { let s=''; const u=new Uint8Array(buf); for (let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); };
-const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-const DOSYA = 'data/armut.json';
-function varsayilanRepo(){
-  const h = location.hostname;
-  if (h.endsWith('.github.io')) return {owner: h.split('.')[0], repo: location.pathname.split('/').filter(Boolean)[0] || h};
-  return {owner:'', repo:'armut'};
+/* ---------- Google Drive (YKS-LGS ile aynı yöntem) ---------- */
+let gTok = (() => { try { return JSON.parse(localStorage.getItem(LS_TOK)); } catch(e){ return null; } })();
+const tokOk = () => gTok && gTok.exp > now() + 60000;
+let durumSync = 'off', gonderZ = null, mesgul = false, tokenClient = null;
+function gisYukle(){
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => no(new Error('Google yüklenemedi (internet?)')); document.head.appendChild(s); });
 }
-const syncAktif = () => !!(cfg.owner && cfg.repo);
-let sha = null, durumSync = 'off', gonderZ = null, mesgul = false;
+function driveBaglan(){ // dokunuşla çağrılır (açılır pencere)
+  if (!window.google?.accounts?.oauth2){ gisYukle().then(() => toast('Hazır, tekrar dokun')).catch(e => toast(e.message)); return; }
+  tokenClient = tokenClient || google.accounts.oauth2.initTokenClient({client_id: GCID, scope: GSCOPE,
+    callback: r => { if (r.error){ toast('Google girişi yapılamadı'); return; }
+      gTok = {t: r.access_token, exp: now() + (r.expires_in||3600) * 1000}; localStorage.setItem(LS_TOK, JSON.stringify(gTok));
+      cfg.gBagli = true; saveCfg(); esitle(); },
+    error_callback: () => toast('Google girişi iptal edildi')});
+  tokenClient.requestAccessToken({prompt: cfg.gBagli ? '' : 'consent'});
+}
+function driveKes(){ if (gTok && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(gTok.t, () => {});
+  gTok = null; localStorage.removeItem(LS_TOK); cfg.gBagli = false; cfg.folderId = cfg.fileId = null; saveCfg(); syncDurum('off'); render(); }
+async function gf(url, opt = {}){
+  const r = await fetch(url, {...opt, headers: {...(opt.headers||{}), Authorization: 'Bearer ' + gTok.t}});
+  if (r.status === 401){ gTok = null; localStorage.removeItem(LS_TOK); const e = new Error('Google oturumunun süresi doldu. Üstteki Drive düğmesine dokun.'); e.auth = 1; throw e; }
+  if (!r.ok){ const e = new Error('Drive hatası (' + r.status + ')'); e.status = r.status; throw e; }
+  return r;
+}
+async function klasorId(){
+  if (cfg.folderId) return cfg.folderId;
+  const q = encodeURIComponent(`name='${DFOLD}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  let id = (await (await gf(`${GAPI}?q=${q}&fields=files(id)&spaces=drive`)).json()).files?.[0]?.id;
+  if (!id) id = (await (await gf(`${GAPI}?fields=id`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name: DFOLD, mimeType:'application/vnd.google-apps.folder'})})).json()).id;
+  cfg.folderId = id; saveCfg(); return id;
+}
+async function dosyaBul(){
+  if (cfg.fileId) return cfg.fileId;
+  const fid = await klasorId(), q = encodeURIComponent(`name='${DFILE}' and '${fid}' in parents and trashed=false`);
+  cfg.fileId = (await (await gf(`${GAPI}?q=${q}&fields=files(id)&spaces=drive`)).json()).files?.[0]?.id || null; saveCfg(); return cfg.fileId;
+}
+async function dosyaOlustur(ad, icerik){
+  const fid = await klasorId(), b = 'armut' + uid();
+  const body = `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name: ad, parents: [fid], mimeType:'application/json'})}\r\n--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${icerik}\r\n--${b}--`;
+  return (await (await gf(`${GUP}?uploadType=multipart&fields=id`, {method:'POST', headers:{'Content-Type':'multipart/related; boundary=' + b}, body})).json()).id;
+}
+async function driveOku(){
+  const id = await dosyaBul(); if (!id) return null;
+  try { return await (await gf(`${GAPI}/${id}?alt=media`, {cache:'no-store'})).json(); }
+  catch(e){ if (e.status === 404){ cfg.fileId = null; saveCfg(); return null; } throw e; }
+}
+async function driveYaz(){
+  const icerik = JSON.stringify(db), id = await dosyaBul();
+  if (id){ try { await gf(`${GUP}/${id}?uploadType=media`, {method:'PATCH', headers:{'Content-Type':'application/json; charset=UTF-8'}, body: icerik}); }
+    catch(e){ if (e.status !== 404) throw e; cfg.fileId = await dosyaOlustur(DFILE, icerik); saveCfg(); } }
+  else { cfg.fileId = await dosyaOlustur(DFILE, icerik); saveCfg(); }
+  if (cfg.sonYedek !== today()){ await dosyaOlustur(`yedek_${today()}.json`, icerik); cfg.sonYedek = today(); saveCfg(); } // günlük yedek
+}
 function syncDurum(s){ durumSync = s; const el = $('#syncLbl'), d = $('#syncDot'); if (!el) return;
-  const t = {off:'Yalnız bu cihaz', ok:'Güncel', wait:'Eşitleniyor…', err:'Eşitleme hatası', ro:'Güncel'};
-  el.textContent = t[s] || s; d.className = 'dot ' + ({ok:'ok',ro:'ok',wait:'wait',err:'err'}[s]||''); }
-function ghHeaders(){ const h = {'Accept':'application/vnd.github+json'}; if (cfg.token) h.Authorization = 'Bearer ' + cfg.token; return h; }
-const apiUrl = () => `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${DOSYA}`;
-async function uzaktanOku(){
-  let r;
-  try { r = await fetch(apiUrl() + '?t=' + now(), {headers: ghHeaders(), cache:'no-store'}); } catch(e){ r = null; }
-  if (r && r.status === 404) return {yok:true};
-  if (!r || !r.ok){
-    if (isAdmin()) throw new Error('GitHub okuma hatası' + (r ? ' (' + r.status + ')' : ''));
-    const r2 = await fetch(DOSYA + '?t=' + now(), {cache:'no-store'}); // izleyici: Pages kopyası
-    if (r2.status === 404) return {yok:true};
-    if (!r2.ok) throw new Error('Veri okunamadı (' + r2.status + ')');
-    return {db: await r2.json()};
-  }
-  const j = await r.json(); sha = j.sha;
-  if (j.content && j.encoding === 'base64') return {db: JSON.parse(new TextDecoder().decode(unb64(j.content.replace(/\n/g,''))))};
-  const r3 = await fetch(j.download_url + '?t=' + now(), {cache:'no-store'}); return {db: await r3.json()};
-}
-async function uzagaYaz(){
-  const body = {message: 'Armut veri güncelleme ' + new Date().toLocaleString('tr-TR'), content: b64(new TextEncoder().encode(JSON.stringify(db)))};
-  if (sha) body.sha = sha;
-  const r = await fetch(apiUrl(), {method:'PUT', headers: {...ghHeaders(), 'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  if (r.status === 409 || r.status === 422) return 'cakisma';
-  if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error('GitHub anahtarı (token) geçersiz, süresi dolmuş ya da yetkisi yok. Ayarlar → Yönetici girişi.');
-  if (!r.ok) throw new Error('GitHub yazma hatası (' + r.status + ')');
-  sha = (await r.json()).content.sha; return 'ok';
+  const t = {off:'Drive’a bağlan', ok:'Drive · güncel', wait:'Eşitleniyor…', err:'Eşitleme hatası', ro:'Güncel', need:'Kaydetmek için dokun'};
+  el.textContent = t[s] || s; d.className = 'dot ' + ({ok:'ok', ro:'ok', wait:'wait', err:'err', need:'wait'}[s] || ''); }
+function syncTikla(){
+  if (VIEWER) return esitle();
+  if (!tokOk()) return driveBaglan();
+  esitle();
 }
 async function esitle(sessiz){
-  if (!syncAktif() || mesgul) return; mesgul = true; syncDurum('wait');
+  if (mesgul) return;
+  if (VIEWER){ // izleyici: yöneticinin son verisini oku
+    mesgul = true; syncDurum('wait');
+    try { const r = await fetch(`${GAPI}/${encodeURIComponent(VIEWER.id)}?alt=media&key=${encodeURIComponent(VIEWER.k)}&t=${now()}`, {cache:'no-store'});
+      if (!r.ok) throw new Error(r.status === 404 ? 'Paylaşılan dosya bulunamadı. Yeni bağlantı iste.' : 'Veri alınamadı (' + r.status + ')');
+      db = uyumla(await r.json()); saveLocal(); cfg.sonSync = now(); saveCfg(); syncDurum('ro'); render();
+    } catch(e){ syncDurum('err'); if (!sessiz) toast(e.message, 4000); }
+    finally { mesgul = false; } return;
+  }
+  if (!tokOk()){ syncDurum(cfg.gBagli ? 'need' : 'off'); return; }
+  mesgul = true; syncDurum('wait');
   try {
-    const u = await uzaktanOku();
-    if (u.db){ db = isAdmin() ? birlestir(db, u.db) : u.db; saveLocal(); }
-    if (isAdmin()){
-      let r = await uzagaYaz();
-      if (r === 'cakisma'){ const u2 = await uzaktanOku(); if (u2.db) db = birlestir(db, u2.db); saveLocal(); r = await uzagaYaz(); }
-      if (r !== 'ok') throw new Error('Eşitlenemedi, birazdan tekrar denenecek.');
-    } else if (u.yok) throw new Error('Henüz paylaşılmış veri yok.');
-    syncDurum(isAdmin() ? 'ok' : 'ro'); cfg.sonSync = now(); saveCfg();
-    render();
-  } catch(e){ syncDurum('err'); if (!sessiz) toast(e.message, 4000); console.warn(e); }
+    const uzak = await driveOku();
+    if (uzak) db = birlestir(db, uzak);
+    saveLocal(); await driveYaz();
+    cfg.bekleyen = false; cfg.sonSync = now(); saveCfg(); syncDurum('ok'); render();
+  } catch(e){ syncDurum(e.auth ? 'need' : 'err'); if (!sessiz) toast(e.message, 4000); console.warn(e); }
   finally { mesgul = false; }
 }
-function planlaGonder(){ syncDurum('wait'); clearTimeout(gonderZ); gonderZ = setTimeout(() => esitle(true), 1500); }
+function planlaGonder(){ if (!tokOk()){ syncDurum(cfg.gBagli ? 'need' : 'off'); return; } syncDurum('wait'); clearTimeout(gonderZ); gonderZ = setTimeout(() => esitle(true), 1500); }
 
-/* ---------- arayüz durumu ---------- */
-let sekme = 'ana', filtre = {q:'', kat:'', tur:''}, raporMod = 'donem';
+/* ---------- eşime bağlantı ---------- */
+function paylasFormu(){
+  if (!tokOk()) return toast('Önce Drive’a bağlan');
+  sheet(`<h2>📲 Eşime bağlantı</h2>
+    <p class="small muted" style="margin-top:0">YKS-LGS Takip'teki gibi: bağlantıyı bir kez gönderirsin, eşin uygulamayı her açtığında senin son girdiğin verileri görür. Kayıt değiştiremez.</p>
+    <label class="f">Google API anahtarı (AIza… ile başlar)</label>
+    <input class="i" id="pK" value="${esc(cfg.apiKey||'')}" placeholder="AIza…">
+    <p class="small muted">YKS-LGS'de kullandığın anahtarın aynısı. Eşine gönderdiğin YKS-LGS bağlantısında <b>k=</b> işaretinden sonraki kısım.</p>
+    <div class="btns"><button class="btn" id="pOl">Bağlantıyı oluştur</button></div><div id="pSon"></div>`);
+  $('#pOl').onclick = async () => {
+    const k = $('#pK').value.trim();
+    if (!/^AIza[\w-]{20,}$/.test(k)) return toast('Anahtar AIza ile başlamalı');
+    cfg.apiKey = k; saveCfg();
+    try {
+      $('#pOl').textContent = 'Hazırlanıyor…';
+      if (!(await dosyaBul())) await driveYaz();
+      await gf(`${GAPI}/${cfg.fileId}/permissions`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({role:'reader', type:'anyone'})});
+      const link = location.origin + location.pathname.replace(/index\.html$/, '') + '?izle=' + encodeURIComponent(cfg.fileId) + '&k=' + encodeURIComponent(k);
+      const msg = '🍐 Armut — aile bütçemiz. Aç ve ana ekrana ekle: ' + link;
+      $('#pOl').textContent = 'Bağlantı hazır ✔';
+      $('#pSon').innerHTML = `<textarea class="i" rows="3" readonly onclick="this.select()" style="margin-top:12px">${esc(link)}</textarea>
+        <div class="btns"><a class="btn" style="text-align:center;text-decoration:none;background:#25D366" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp ile gönder</a>
+        <button class="btn ghost" id="pKop">Kopyala</button></div>`;
+      $('#pKop').onclick = async () => { try { await navigator.clipboard.writeText(link); toast('Kopyalandı'); } catch(e){ toast('Kutudaki bağlantıyı basılı tutup kopyala'); } };
+    } catch(e){ $('#pOl').textContent = 'Bağlantıyı oluştur'; toast(e.message, 4000); }
+  };
+}
 
+/* ---------- arayüz ---------- */
+let sekme = 'ana', filtre = {q:'', kat:'', tur:''}, raporMod = 'donem', odMod = 'ay';
+const NAV = [['ana','🍐','Ana Sayfa'],['islem','🧾','Kayıtlar'],['odeme','💳','Ödemeler'],['rapor','📊','Rapor'],['ayar','⚙️','Ayarlar']];
 function render(){
   const root = $('#root');
-  if (!cfg.rol){ cfg = {rol:'izleyici', ...varsayilanRepo()}; saveCfg(); }
-  if (!db){ db = bosDB(); saveLocal(); }
   if (!secili) secili = donemOf(today());
+  const donemli = ['ana','islem','rapor'].includes(sekme) || (sekme === 'odeme' && odMod === 'ay');
+  const yil = sekme === 'rapor' && raporMod === 'yil';
   root.innerHTML = `
   <div class="app">
     <header>
       <img class="logo" src="icons/icon-192.png" alt="">
       <h1>Armut</h1><div class="sp"></div>
-      <div class="sync" onclick="esitle()"><span class="dot" id="syncDot"></span><span id="syncLbl"></span></div>
+      <div class="sync" onclick="syncTikla()"><span class="dot" id="syncDot"></span><span id="syncLbl"></span></div>
     </header>
-    ${['ana','islem','rapor'].includes(sekme) ? `<div class="period">
-      <button class="ib" onclick="secili=kaydir(secili,${raporMod==='yil'&&sekme==='rapor'?-12:-1});render()">‹</button>
-      <b>${sekme==='rapor'&&raporMod==='yil' ? secili.y + ' yılı' : donemAd(secili)}</b>
-      <button class="ib" onclick="secili=kaydir(secili,${raporMod==='yil'&&sekme==='rapor'?12:1});render()">›</button></div>` : ''}
-    <main>${({ana:anaSayfa, islem:islemSayfa, rapor:raporSayfa, durum:durumSayfa, ayar:ayarSayfa})[sekme]()}</main>
+    ${donemli ? `<div class="period">
+      <button class="ib" onclick="secili=kaydir(secili,${yil?-12:-1});render()">‹</button>
+      <b>${yil ? secili.y + ' yılı' : donemAd(secili)}</b>
+      <button class="ib" onclick="secili=kaydir(secili,${yil?12:1});render()">›</button></div>` : '<div style="height:6px"></div>'}
+    <main>${({ana:anaSayfa, islem:islemSayfa, odeme:odemeSayfa, rapor:raporSayfa, ayar:ayarSayfa})[sekme]()}</main>
   </div>
-  ${isAdmin() && sekme !== 'ayar' ? '<button class="fab" onclick="islemFormu()" aria-label="Yeni kayıt">+</button>' : ''}
-  <nav><div class="in">
-    ${[['ana','🍐','Ana Sayfa'],['islem','🧾','Kayıtlar'],['rapor','📊','Rapor'],['durum','⚖️','Durum'],['ayar','⚙️','Ayarlar']]
-      .map(([k,e,t]) => `<button class="${sekme===k?'on':''}" onclick="sekme='${k}';render();scrollTo(0,0)"><span class="e">${e}</span>${t}</button>`).join('')}
-  </div></nav>`;
-  syncDurum(syncAktif() ? (durumSync === 'off' ? (isAdmin()?'ok':'ro') : durumSync) : 'off');
-}
-
-/* ---------- yönetici girişi ---------- */
-function yoneticiFormu(){
-  const r = varsayilanRepo();
-  sheet(`<h2>🔑 Yönetici girişi</h2>
-    <p class="small muted" style="margin-top:0">Kayıt ekleyip değiştirebilmek için GitHub anahtarını (token) gir. Anahtar yalnız bu cihazda saklanır.</p>
-    <label class="f">GitHub anahtarı (token)</label><input class="i" id="yT" type="password" placeholder="github_pat_…" value="${esc(cfg.token||'')}">
-    <details class="ac" style="margin-top:8px"><summary class="small">Depo bilgisi</summary>
-      <div class="row2"><div><label class="f">GitHub kullanıcı</label><input class="i" id="yO" value="${esc(cfg.owner||r.owner)}"></div>
-      <div><label class="f">Depo</label><input class="i" id="yR" value="${esc(cfg.repo||r.repo)}"></div></div></details>
-    <div class="btns">${isAdmin()?'<button class="btn red" id="yC">İzleyiciye dön</button>':'<button class="btn ghost" onclick="kapat()">Vazgeç</button>'}<button class="btn" id="yK">Kaydet</button></div>`);
-  if ($('#yC')) $('#yC').onclick = () => { cfg.rol = 'izleyici'; cfg.token = ''; saveCfg(); kapat(); render(); esitle(true); };
-  $('#yK').onclick = async () => { const t = $('#yT').value.trim(); if (!t) return toast('Token gir');
-    cfg = {...cfg, rol:'admin', token:t, owner:$('#yO').value.trim(), repo:$('#yR').value.trim()}; sha = null; saveCfg(); kapat(); render(); await esitle(); };
+  ${isAdmin() && ['ana','islem'].includes(sekme) ? '<button class="fab" onclick="islemFormu()" aria-label="Yeni kayıt">+</button>' : ''}
+  ${isAdmin() && sekme === 'odeme' && odMod === 'plan' ? '<button class="fab" onclick="planFormu()" aria-label="Yeni ödeme planı">+</button>' : ''}
+  <nav><div class="in">${NAV.map(([k,e,t]) => `<button class="${sekme===k?'on':''}" onclick="sekme='${k}';render();scrollTo(0,0)"><span class="e">${e}</span>${t}</button>`).join('')}</div></nav>`;
+  syncDurum(VIEWER ? (durumSync === 'err' ? 'err' : durumSync === 'wait' ? 'wait' : 'ro')
+    : !tokOk() ? (cfg.gBagli ? 'need' : 'off') : (mesgul ? 'wait' : durumSync === 'err' ? 'err' : 'ok'));
 }
 
 /* ---------- ANA SAYFA ---------- */
@@ -372,11 +462,15 @@ function anaSayfa(){
   const [s,e] = donemAralik(secili), list = islemlerArasi(s,e), o = ozet(list), dag = katDagilim(list);
   const butce = +db.ayar.butce || 0, oran = butce ? o.gider / butce : 0;
   const top = dag.slice(0,5), max = top.length ? top[0][1] : 1;
-  const son = [...list].sort((a,b) => b.t === a.t ? b.u - a.u : (b.t > a.t ? 1 : -1)).slice(0,6);
-  const sabitEksik = isAdmin() && live(db.sabitler).length && !list.some(x => x.sabit);
+  const son = [...list].sort((a,b) => b.t === a.t ? b.u - a.u : (b.t > a.t ? 1 : -1)).slice(0,5);
+  const pl = buAyPlanlar(ayKey(secili)), od = pl.filter(x => x.od).length, bekl = pl.filter(x => !x.od).reduce((a,x) => a + x.tahmin, 0);
+  const bos = !live(db.islemler).length && !live(db.planlar).length;
   return `
+  ${bos && isAdmin() ? `<div class="card" style="text-align:center"><div style="font-size:34px">🍐</div><b>Armut'a hoş geldin</b>
+    <p class="small muted">Verilerin telefonunla bilgisayarın arasında eşitlensin diye önce Google Drive'a bağlan. Sonra Excel'den hazırladığım ilk veri dosyasını yükle.</p>
+    <div class="btns"><button class="btn" onclick="driveBaglan()">Drive’a bağlan</button><button class="btn ghost" onclick="dosyaSec()">İlk veriyi yükle</button></div></div>` : ''}
   <div class="card hero">
-    <div class="lbl">Bu dönem harcanan</div>
+    <div class="lbl">Bu ay harcanan</div>
     <div class="big">${TL(o.gider)}</div>
     <div class="trio">
       <div class="pill in"><small>Gelir</small><b>${TL(o.gelir)}</b></div>
@@ -385,38 +479,38 @@ function anaSayfa(){
     ${butce ? `<div class="budget"><div class="track"><i class="${oran>1?'over':''}" style="width:${Math.min(100,oran*100).toFixed(1)}%"></i></div>
       <div class="row"><span>Bütçe ${TL(butce)}</span><span>${oran>1 ? TL(o.gider-butce)+' aşıldı' : TL(butce-o.gider)+' kaldı'}</span></div></div>` : ''}
   </div>
-  ${sabitEksik ? `<div class="card" style="display:flex;align-items:center;gap:12px"><div style="font-size:26px">📅</div>
-     <div style="flex:1"><b>Sabit giderler</b><div class="small muted">Bu dönemin aidat, fatura, kredi kayıtları henüz yok.</div></div>
-     <button class="btn sm" onclick="sabitFormu()">Ekle</button></div>` : ''}
+  ${pl.length ? `<div class="card" style="cursor:pointer" onclick="sekme='odeme';odMod='ay';render()">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">💳 Bu ayın ödemeleri</h3><span class="small"><b>${od}/${pl.length}</b> ödendi ›</span></div>
+    <div class="track" style="margin:10px 0 6px"><i style="width:${pl.length ? od/pl.length*100 : 0}%"></i></div>
+    <div class="small muted">${bekl > 0 ? 'Bekleyen yaklaşık <b style="color:var(--ink)">' + TL(bekl) + '</b>' : 'Bu ayın tüm ödemeleri yapıldı 🎉'}</div></div>` : ''}
   <div class="card cats"><h3>En çok harcanan</h3>
-    ${top.length ? top.map(([k,v]) => { const c = kat(k); return `<div class="c" title="${esc(c.ad)}: ${TL(v)}"><div class="ic">${c.ikon}</div>
+    ${top.length ? top.map(([k,v]) => { const c = kat(k); return `<div class="c"><div class="ic">${c.ikon}</div>
       <div><div class="nm">${esc(c.ad)}<span>%${Math.round(v/o.gider*100)}</span></div><div class="bar"><i style="width:${Math.max(2,v/max*100)}%"></i></div></div>
-      <div class="v">${TL(v)}</div></div>`; }).join('') : '<div class="empty">Bu dönem henüz harcama yok.</div>'}
+      <div class="v">${TL(v)}</div></div>`; }).join('') : '<div class="empty">Bu ay henüz harcama yok.</div>'}
   </div>
   <div class="card"><h3>Son kayıtlar</h3>
-    ${son.length ? son.map(txSatir).join('') + `<div style="text-align:center;margin-top:8px"><button class="btn ghost sm" onclick="sekme='islem';render()">Tümünü gör</button></div>` : '<div class="empty">Kayıt yok. ' + (isAdmin() ? 'Sağ alttaki + ile ekleyebilirsin.' : '') + '</div>'}
+    ${son.length ? son.map(txSatir).join('') + `<div style="text-align:center;margin-top:8px"><button class="btn ghost sm" onclick="sekme='islem';render()">Tümünü gör</button></div>`
+      : '<div class="empty">Kayıt yok.' + (isAdmin() ? ' Sağ alttaki + ile ekleyebilirsin.' : '') + '</div>'}
   </div>`;
 }
 function txSatir(x){
   const c = kat(x.kat), out = x.tur !== 'gelir';
   const alt = [fmtDate(x.t), x.kisi && x.kisi !== 'Ortak' ? x.kisi : '', x.odeme].filter(Boolean).join(' · ');
-  return `<div class="tx" onclick="islemFormu('${x.id}')"><div class="ic">${c.ikon}</div>
+  return `<div class="tx" onclick="islemFormu('${x.id}')"><div class="ic">${x.plan ? '💳' : c.ikon}</div>
     <div class="mid"><div class="t1">${esc(x.acik || c.ad)}</div><div class="t2">${esc(c.ad)} · ${esc(alt)}</div></div>
-    <div class="amt ${out?'out':'in'}">${out ? (x.tutar<0?'+':'−') : '+'}${TL(Math.abs(x.tutar))}</div></div>`;
+    <div class="amt ${out?'out':'in'}">${out ? '−' : '+'}${TL(Math.abs(x.tutar))}</div></div>`;
 }
 
 /* ---------- KAYITLAR ---------- */
 function islemSayfa(){
-  const [s,e] = donemAralik(secili);
-  const q = trUp(filtre.q);
-  let list = islemlerArasi(s,e).filter(x => (!filtre.kat || x.kat === filtre.kat) && (!filtre.tur || x.tur === filtre.tur) && (!q || trUp(x.acik + ' ' + kat(x.kat).ad + ' ' + (x.kisi||'')).includes(q)));
-  list.sort((a,b) => b.t === a.t ? b.u - a.u : (b.t > a.t ? 1 : -1));
-  const o = ozet(list);
-  let html = '', gun = '';
+  const [s,e] = donemAralik(secili), q = trUp(filtre.q);
+  const list = islemlerArasi(s,e).filter(x => (!filtre.kat || x.kat === filtre.kat) && (!filtre.tur || x.tur === filtre.tur) && (!q || trUp(x.acik + ' ' + kat(x.kat).ad + ' ' + (x.kisi||'')).includes(q)))
+    .sort((a,b) => b.t === a.t ? b.u - a.u : (b.t > a.t ? 1 : -1));
+  const o = ozet(list); let html = '', gun = '';
   for (const x of list){ if (x.t !== gun){ gun = x.t; html += `<div class="day">${fmtDate(gun)}</div>`; } html += txSatir(x); }
   return `
   <div class="card">
-    <input class="i" placeholder="Ara: market, Arya, elektrik…" value="${esc(filtre.q)}" oninput="filtre.q=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const i=document.querySelector('.card input.i');i.focus();i.setSelectionRange(99,99)},350)">
+    <input class="i" id="araQ" placeholder="Ara: market, Arya, elektrik…" value="${esc(filtre.q)}" oninput="filtre.q=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const i=$('#araQ');i.focus();i.setSelectionRange(99,99)},350)">
     <div class="row2" style="margin-top:8px">
       <select class="i" onchange="filtre.tur=this.value;render()"><option value="">Gelir + gider</option><option value="gider" ${filtre.tur==='gider'?'selected':''}>Yalnız gider</option><option value="gelir" ${filtre.tur==='gelir'?'selected':''}>Yalnız gelir</option></select>
       <select class="i" onchange="filtre.kat=this.value;render()"><option value="">Tüm kategoriler</option>${live(db.kategoriler).map(k=>`<option value="${k.id}" ${filtre.kat===k.id?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('')}</select>
@@ -426,295 +520,300 @@ function islemSayfa(){
   <div class="card">${html || '<div class="empty">Bu filtrede kayıt yok.</div>'}</div>`;
 }
 
+/* ---------- ÖDEMELER ---------- */
+function odemeSayfa(){
+  const seg = `<div class="seg">${[['ay','Bu ay'],['plan','Planlar'],['durum','Borç · Varlık']].map(([k,t]) => `<button class="${odMod===k?'on':''}" onclick="odMod='${k}';render()">${t}</button>`).join('')}</div>`;
+  return seg + ({ay: odemeAy, plan: planListe, durum: durumSayfa})[odMod]();
+}
+function odemeAy(){
+  const key = ayKey(secili), L = buAyPlanlar(key);
+  const odenen = L.filter(x=>x.od).reduce((a,x)=>a + Math.abs(x.od.tutar), 0), bekl = L.filter(x=>!x.od).reduce((a,x)=>a + x.tahmin, 0);
+  const belli = L.filter(x => !x.od && x.pl.tip !== 'sabit' || (!x.od && x.tahmin > 0));
+  if (!L.length) return `<div class="card empty">Bu ay için ödeme planı yok.<br>${isAdmin() ? '<button class="btn sm" style="margin-top:12px" onclick="odMod=\'plan\';render()">Plan ekle</button>' : ''}</div>`;
+  return `
+  <div class="card"><div class="trio">
+    <div class="pill in"><small>Ödenen</small><b>${TL(odenen)}</b></div>
+    <div class="pill out"><small>Bekleyen (tahmini)</small><b>${TL(bekl)}</b></div></div>
+    <div class="track" style="margin-top:12px"><i style="width:${L.filter(x=>x.od).length/L.length*100}%"></i></div>
+    <div class="small muted" style="margin-top:6px">${L.filter(x=>x.od).length} / ${L.length} ödeme yapıldı</div>
+  </div>
+  <div class="card">
+    ${L.map(({pl, od, tahmin}) => { const sira = planSira(pl, key), kal = planKalan(pl, key);
+      return `<div class="li" ${isAdmin()?`onclick="odeFormu('${pl.id}','${key}')" style="cursor:pointer"`:''}>
+        <div style="font-size:22px;width:30px;text-align:center">${od ? '✅' : PTIP[pl.tip][1]}</div>
+        <div class="grow"><div style="${od?'color:var(--muted)':''}">${esc(pl.ad)} ${sira?`<span class="badge">${sira}</span>`:''}</div>
+          <div class="small muted">${PTIP[pl.tip][0]}${od ? ' · ' + fmtDate(od.t) : ''}${kal && kal.n > (od?0:1) ? ' · ' + (kal.n - (od?0:1)) + ' ay daha' : ''}</div></div>
+        <b class="${od?'':'amt out'}" style="${od?'color:var(--muted)':''}">${TL(od ? Math.abs(od.tutar) : tahmin)}</b></div>`; }).join('')}
+    ${isAdmin() && belli.length ? `<div class="btns"><button class="btn ghost" onclick="tumunuOde('${key}')">Tutarı belli olanların hepsini ödendi işaretle</button></div>` : ''}
+  </div>
+  <p class="small muted" style="text-align:center">${isAdmin() ? 'Bir ödemeye dokun → ödendi olarak işaretle (gider kaydı kendiliğinden eklenir).' : ''}</p>`;
+}
+function odeFormu(pid, key){
+  const pl = db.planlar.find(p => p.id === pid), od = planOdeme(pl, key);
+  if (od){ return sheet(`<h2>✅ ${esc(pl.ad)}</h2><div class="kv"><span class="muted">${ayAd(key)}</span><b>${TL(Math.abs(od.tutar))}</b></div><div class="kv"><span class="muted">Ödeme tarihi</span><b>${fmtDate(od.t)}</b></div>
+    <div class="btns"><button class="btn red" onclick="sil('islemler','${od.id}');kapat();degisti();toast('Ödeme geri alındı')">Ödemeyi geri al</button><button class="btn ghost" onclick="kapat()">Kapat</button></div>`); }
+  const [s,e] = donemAralik(keyP(key)), t = today() >= s && today() <= e ? today() : s, sira = planSira(pl, key);
+  sheet(`<h2>${PTIP[pl.tip][1]} ${esc(pl.ad)} ${sira?`<span class="badge">${sira}</span>`:''}</h2><p class="small muted" style="margin-top:0">${ayAd(key)} ödemesi</p>
+    <input class="i amtin" id="oT" inputmode="decimal" value="${sonTutar(pl) ? nf2.format(sonTutar(pl)) : ''}" placeholder="0 ₺">
+    <div class="row2"><div><label class="f">Ödeme tarihi</label><input class="i" type="date" id="oD" value="${t}"></div>
+    <div><label class="f">Ödeme</label><select class="i" id="oO">${ODEME.map(o=>`<option ${o===(pl.odeme||'Banka')?'selected':''}>${o}</option>`).join('')}</select></div></div>
+    <div class="btns"><button class="btn ghost" onclick="kapat()">Vazgeç</button><button class="btn" id="oK">Ödendi ✔</button></div>`);
+  $('#oK').onclick = () => { const v = parseAmt($('#oT').value); if (!(v > 0)) return toast('Tutarı gir');
+    planOde(pl, key, v, $('#oD').value || t, $('#oO').value); kapat(); degisti(); toast('Ödendi olarak işaretlendi'); };
+}
+function planOde(pl, key, tutar, t, odeme){
+  const sira = planSira(pl, key);
+  upsert('islemler', {id:uid(), tur:'gider', kat:pl.kat, acik: pl.ad + (sira ? ` (${sira})` : ''), tutar, t, plan:pl.id, ay:key, odeme: odeme || pl.odeme || 'Banka', kisi: pl.kisi || 'Ortak'});
+}
+function tumunuOde(key){
+  const L = buAyPlanlar(key).filter(x => !x.od && x.tahmin > 0);
+  if (!confirm(L.length + ' ödeme, son tutarlarıyla ödendi olarak işaretlensin mi?')) return;
+  const [s,e] = donemAralik(keyP(key)), t = today() >= s && today() <= e ? today() : s;
+  L.forEach(x => planOde(x.pl, key, x.tahmin, t)); degisti(); toast(L.length + ' ödeme işaretlendi');
+}
+function planListe(){
+  const key = ayKey(donemOf(today())), P = live(db.planlar);
+  const biten = P.filter(p => p.bit && p.bit < key), aktif = P.filter(p => !(p.bit && p.bit < key));
+  const grup = Object.keys(PTIP).map(t => [t, aktif.filter(p => p.tip === t)]).filter(([,l]) => l.length);
+  const satir = p => { const kal = planKalan(p, key);
+    return `<div class="li" ${isAdmin()?`onclick="planFormu('${p.id}')" style="cursor:pointer"`:''}><div class="grow">
+      <div>${esc(p.ad)}</div><div class="small muted">${kat(p.kat).ikon} ${esc(kat(p.kat).ad)} · ${p.bas ? ayAd(p.bas) : ''}${p.bit ? ' → ' + ayAd(p.bit) : ' · süresiz'}${p.tip==='yillik' && p.aylar?.length ? ' · ' + p.aylar.map(m=>AYK[m-1]).join(', ') : ''}</div>
+      ${kal && kal.n ? `<div class="small"><b>${kal.n}</b> taksit kaldı · <b>${TL(kal.tutar)}</b></div>` : ''}${p.not ? `<div class="small muted">${esc(p.not)}</div>` : ''}</div>
+      <b>${p.tutar ? TL(p.tutar) : sonTutar(p) ? '<span class="muted small">~</span>' + TL(sonTutar(p)) : '<span class="muted small">değişken</span>'}</b></div>`; };
+  return (grup.length ? grup.map(([t,l]) => `<div class="card"><h3>${PTIP[t][1]} ${PTIP[t][0]}</h3>${l.map(satir).join('')}</div>`).join('')
+      : `<div class="card empty">Henüz ödeme planı yok.${isAdmin() ? '<br>Sağ alttaki + ile ekle: aidat, fatura, kredi, kart taksiti, kurs…' : ''}</div>`)
+    + (biten.length ? `<div class="card"><details class="ac" style="border:0;padding:0"><summary>✔ Biten ödemeler (${biten.length})</summary>${biten.map(satir).join('')}</details></div>` : '');
+}
+function planFormu(id){
+  if (!isAdmin()) return;
+  const p = id ? db.planlar.find(x => x.id === id) : {id:uid(), tip:'sabit', ad:'', kat:'fatura', tutar:'', bas: ayKey(donemOf(today())), bit:'', aylar:[], odeme:'Banka', not:''};
+  const say = (p.bas && p.bit) ? (+p.bit.slice(0,4) - +p.bas.slice(0,4))*12 + (+p.bit.slice(5) - +p.bas.slice(5)) + 1 : '';
+  let tip = p.tip, aylar = [...(p.aylar||[])];
+  const ciz = () => {
+    $('#pfB').innerHTML = `
+      <label class="f">Ödeme türü</label><div class="chips" id="pfT">${Object.entries(PTIP).map(([k,[ad,ik]]) => `<button class="chip ${tip===k?'on':''}" data-t="${k}">${ik} ${ad}</button>`).join('')}</div>
+      <label class="f">Adı</label><input class="i" id="pfA" value="${esc($('#pfA')?.value ?? p.ad)}" placeholder="${{sabit:'ör. Elektrik, Site aidatı', taksit:'ör. Davlumbaz (Trendyol)', kredi:'ör. Denizbank kredi', kurs:'ör. Arya deneme kulübü', yillik:'ör. DASK, Emlak vergisi'}[tip]}">
+      <div class="row2"><div><label class="f">${tip==='sabit'?'Aylık tutar (değişkense boş)':'Aylık / taksit tutarı'}</label><input class="i" id="pfU" inputmode="decimal" value="${esc($('#pfU')?.value ?? (p.tutar ? nf2.format(p.tutar) : ''))}"></div>
+      <div><label class="f">Kategori</label><select class="i" id="pfK">${live(db.kategoriler).filter(k=>k.tur==='gider').map(k=>`<option value="${k.id}" ${($('#pfK')?.value ?? p.kat)===k.id?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('')}</select></div></div>
+      <div class="row2"><div><label class="f">İlk ödeme ayı</label><input class="i" type="month" id="pfS" value="${$('#pfS')?.value ?? p.bas}"></div>
+      <div><label class="f">${tip==='sabit'||tip==='yillik'?'Kaç ay sürecek (boş = süresiz)':'Taksit / ay sayısı'}</label><input class="i" id="pfN" inputmode="numeric" value="${$('#pfN')?.value ?? say}"></div></div>
+      ${tip==='taksit' ? '<p class="small muted" style="margin:6px 0 0">Toplam tutarı biliyorsan: tutar alanına toplamı yaz, sayıya taksiti yaz, sonra “Toplamı böl”e bas. <button class="btn ghost sm" id="pfBol">Toplamı böl</button></p>' : ''}
+      ${tip==='yillik' ? `<label class="f">Hangi aylarda?</label><div class="chips" id="pfM">${AYK.map((a,i)=>`<button class="chip ${aylar.includes(i+1)?'on':''}" data-m="${i+1}">${a}</button>`).join('')}</div>` : ''}
+      <label class="f">Ödeme şekli</label><select class="i" id="pfO">${ODEME.map(o=>`<option ${o===($('#pfO')?.value ?? p.odeme)?'selected':''}>${o}</option>`).join('')}</select>
+      <label class="f">Not</label><input class="i" id="pfX" value="${esc($('#pfX')?.value ?? (p.not||''))}" placeholder="ör. erken kapama 83.586 ₺">
+      <div class="btns">${id?'<button class="btn red" id="pfSil">Sil</button>':''}<button class="btn" id="pfK2">Kaydet</button></div>`;
+    document.querySelectorAll('#pfT .chip').forEach(b => b.onclick = () => { tip = b.dataset.t; ciz(); });
+    document.querySelectorAll('#pfM .chip').forEach(b => b.onclick = () => { const m = +b.dataset.m; aylar = aylar.includes(m) ? aylar.filter(x=>x!==m) : [...aylar, m].sort((a,b)=>a-b); b.classList.toggle('on'); });
+    if ($('#pfBol')) $('#pfBol').onclick = () => { const t = parseAmt($('#pfU').value), n = +$('#pfN').value; if (t > 0 && n > 1){ $('#pfU').value = nf2.format(Math.round(t/n*100)/100); toast('Taksit tutarı: ' + TL(t/n)); } else toast('Toplam tutar ve taksit sayısı gir'); };
+    if (id) $('#pfSil').onclick = () => { if (confirm('Plan silinsin mi? Yapılmış ödemeler kayıtlarda kalır.')){ sil('planlar', id); kapat(); degisti(); } };
+    $('#pfK2').onclick = () => {
+      const ad = $('#pfA').value.trim(), bas = $('#pfS').value, n = parseInt($('#pfN').value);
+      if (!ad) return toast('Ad gir'); if (!bas) return toast('İlk ödeme ayını seç');
+      if (tip !== 'sabit' && tip !== 'yillik' && !(n > 0)) return toast('Taksit / ay sayısını gir');
+      if (tip === 'yillik' && !aylar.length) return toast('Ödeme aylarını seç');
+      const bit = n > 0 ? ayKey(kaydir(keyP(bas), n-1)) : '';
+      upsert('planlar', {...p, tip, ad, tutar: parseAmt($('#pfU').value) || 0, kat: $('#pfK').value, bas, bit, aylar: tip==='yillik' ? aylar : [], odeme: $('#pfO').value, not: $('#pfX').value.trim()});
+      kapat(); degisti(); toast('Kaydedildi');
+    };
+  };
+  sheet(`<h2>${id ? 'Ödeme planını düzenle' : 'Yeni ödeme planı'}</h2><div id="pfB"></div>`); ciz();
+}
+
+/* ---------- BORÇ · VARLIK ---------- */
+const DTIP = {varlik:['Varlıklar','💰','Banka hesapları, nakit, birikim'], alacak:['Alacaklar','🤝','Başkasında olan paramız'], borc:['Diğer borçlar','🧾','Planlarda olmayan borçlar (ör. kart ekstresi, avans hesap)']};
+function durumSayfa(){
+  const d = live(db.durum), top = t => d.filter(x=>x.tip===t).reduce((a,x)=>a + +x.tutar, 0);
+  const key = ayKey(donemOf(today()));
+  const pb = live(db.planlar).filter(p => p.bit && p.tip !== 'sabit' && p.tip !== 'yillik').map(p => ({p, k: planKalan(p, key)})).filter(x => x.k && x.k.n);
+  const planBorc = pb.reduce((a,x) => a + x.k.tutar, 0);
+  const net = top('varlik') + top('alacak') - top('borc') - planBorc;
+  const kart = (t) => { const [ad,ik,acik] = DTIP[t];
+    return `<div class="card"><h3>${ik} ${ad} <span style="float:right;color:var(--ink);text-transform:none;letter-spacing:0">${TL(top(t))}</span></h3>
+    ${d.filter(x=>x.tip===t).sort((a,b)=>b.tutar-a.tutar).map(x => `<div class="li" ${isAdmin()?`onclick="durumFormu('${x.id}')" style="cursor:pointer"`:''}>
+      <div class="grow"><div>${esc(x.ad)}</div>${x.not?`<div class="small muted">${esc(x.not)}</div>`:''}</div><b>${TL(x.tutar)}</b></div>`).join('') || `<div class="small muted">${acik}</div>`}
+    ${isAdmin() ? `<div style="margin-top:8px"><button class="btn ghost sm" onclick="durumFormu(null,'${t}')">+ Ekle</button></div>` : ''}</div>`; };
+  return `
+  <div class="card hero"><div class="lbl">Net durum (varlık + alacak − borç)</div>
+    <div class="net" style="color:${net<0?'var(--gider)':'var(--ink)'}">${TL(net)}</div></div>
+  ${kart('varlik')}${kart('alacak')}
+  <div class="card"><h3>💳 Taksit ve kredilerden kalan <span style="float:right;color:var(--ink);text-transform:none;letter-spacing:0">${TL(planBorc)}</span></h3>
+    ${pb.map(({p,k}) => `<div class="li"><div class="grow"><div>${esc(p.ad)}</div><div class="small muted">${k.n} × ${TL(p.tutar)} · son ${ayAd(p.bit)}</div></div><b>${TL(k.tutar)}</b></div>`).join('') || '<div class="small muted">Ödemeler → Planlar bölümündeki taksitlerden kendiliğinden hesaplanır.</div>'}</div>
+  ${kart('borc')}`;
+}
+function durumFormu(id, tip){
+  const x = id ? db.durum.find(d=>d.id===id) : {id:uid(), tip, ad:'', tutar:'', not:''};
+  sheet(`<h2>${DTIP[x.tip][1]} ${DTIP[x.tip][0]}</h2>
+    <label class="f">Ad</label><input class="i" id="dAd" value="${esc(x.ad)}" placeholder="ör. Garanti hesap">
+    <label class="f">Tutar (₺)</label><input class="i" id="dTut" inputmode="decimal" value="${x.tutar!==''?nf2.format(x.tutar):''}">
+    <label class="f">Not</label><input class="i" id="dNot" value="${esc(x.not)}">
+    <div class="btns">${id?`<button class="btn red" onclick="sil('durum','${id}');kapat();degisti()">Sil</button>`:''}<button class="btn" id="dKay">Kaydet</button></div>`);
+  $('#dKay').onclick = () => { const t = parseAmt($('#dTut').value); if (!$('#dAd').value.trim() || isNaN(t)) return toast('Ad ve tutar gerekli');
+    upsert('durum', {...x, ad:$('#dAd').value.trim(), tutar:t, not:$('#dNot').value.trim()}); kapat(); degisti(); };
+}
+
 /* ---------- RAPOR ---------- */
 function raporSayfa(){
-  const seg = `<div class="seg"><button class="${raporMod==='donem'?'on':''}" onclick="raporMod='donem';render()">Dönem</button><button class="${raporMod==='yil'?'on':''}" onclick="raporMod='yil';render()">Yıl</button></div>`;
+  const seg = `<div class="seg"><button class="${raporMod==='donem'?'on':''}" onclick="raporMod='donem';render()">Ay</button><button class="${raporMod==='yil'?'on':''}" onclick="raporMod='yil';render()">Yıl</button></div>`;
   return seg + (raporMod === 'donem' ? raporDonem() : raporYil()) + `
-  <div class="card"><h3>Dışa aktar</h3><div class="btns" style="margin-top:0">
-    <button class="btn" onclick="excelIndir()">📥 Excel raporu</button></div>
-    <p class="small muted" style="margin:8px 0 0">${raporMod==='yil'?secili.y+' yılının':'Seçili dönemin'} kayıtları + kategori×ay tablosu + sabit giderler + borç/varlık durumu.</p></div>`;
+  <div class="card"><h3>Dışa aktar</h3><button class="btn" onclick="excelIndir()">📥 Excel raporu</button>
+    <p class="small muted" style="margin:8px 0 0">${raporMod==='yil'?secili.y+' yılının':'Seçili ayın'} kayıtları + kategori×ay tablosu + ödeme planları + borç/varlık.</p></div>`;
 }
 function raporDonem(){
   const [s,e] = donemAralik(secili), list = islemlerArasi(s,e), o = ozet(list), dag = katDagilim(list), gel = katDagilim(list,'gelir');
-  const max = dag.length ? dag[0][1] : 1;
-  const bugun = today(), gunSay = Math.max(1, Math.round((new Date((bugun < e ? (bugun < s ? s : bugun) : e)+'T12:00') - new Date(s+'T12:00'))/864e5) + 1);
+  const max = dag.length ? dag[0][1] : 1, bugun = today();
+  const son = bugun < s ? s : bugun > e ? e : bugun, gunSay = Math.round((new Date(son+'T12:00') - new Date(s+'T12:00'))/864e5) + 1;
   const mutfak = list.filter(x => x.tur==='gider' && ['online-market','market'].includes(x.kat)).reduce((a,x)=>a + +x.tutar, 0);
   const kisi = {}; list.filter(x=>x.tur==='gider').forEach(x => kisi[x.kisi||'Ortak'] = (kisi[x.kisi||'Ortak']||0) + +x.tutar);
-  const odeme = {}; list.filter(x=>x.tur==='gider').forEach(x => odeme[x.odeme||'—'] = (odeme[x.odeme||'—']||0) + +x.tutar);
-  const onceki = (() => { const [a,b] = donemAralik(kaydir(secili,-1)); return ozet(islemlerArasi(a,b)).gider; })();
-  const fark = onceki ? (o.gider - onceki) / onceki * 100 : null;
+  const [ps,pe] = donemAralik(kaydir(secili,-1)), onceki = ozet(islemlerArasi(ps,pe)).gider, fark = onceki ? (o.gider - onceki) / onceki * 100 : null;
+  const planli = list.filter(x => x.tur==='gider' && x.plan).reduce((a,x)=>a + +x.tutar, 0);
   return `
   <div class="card"><div class="trio">
     <div class="pill out"><small>Gider</small><b>${TL(o.gider)}</b></div>
     <div class="pill in"><small>Gelir</small><b>${TL(o.gelir)}</b></div></div>
     <div class="kv" style="margin-top:10px"><span class="muted">Net</span><b style="color:${o.net<0?'var(--gider)':'var(--gelir)'}">${TL(o.net)}</b></div>
-    ${fark!==null ? `<div class="kv"><span class="muted">Önceki döneme göre gider</span><b>${fark>0?'▲':'▼'} %${Math.abs(fark).toFixed(0)}</b></div>` : ''}
-    <div class="kv"><span class="muted">Günlük mutfak maliyeti (market)</span><b>${TL(mutfak/gunSay)}</b></div>
+    ${fark!==null ? `<div class="kv"><span class="muted">Önceki aya göre gider</span><b>${fark>0?'▲':'▼'} %${Math.abs(fark).toFixed(0)}</b></div>` : ''}
+    <div class="kv"><span class="muted">Sabit ödemeler / taksitler</span><b>${TL(planli)}</b></div>
+    <div class="kv"><span class="muted">Günlük ev harcaması (market)</span><b>${TL(mutfak/gunSay)}</b></div>
     <div class="kv"><span class="muted">Günlük ortalama harcama</span><b>${TL(o.gider/gunSay)}</b></div>
   </div>
   <div class="card cats"><h3>Kategorilere göre gider</h3>
-    ${dag.length ? dag.map(([k,v]) => { const c = kat(k); return `<div class="c" title="${esc(c.ad)}: ${TL(v)}"><div class="ic">${c.ikon}</div>
+    ${dag.length ? dag.map(([k,v]) => { const c = kat(k); return `<div class="c"><div class="ic">${c.ikon}</div>
       <div><div class="nm">${esc(c.ad)}<span>%${(v/o.gider*100).toFixed(1)}</span></div><div class="bar"><i style="width:${Math.max(1,v/max*100)}%"></i></div></div><div class="v">${TL(v)}</div></div>`; }).join('') : '<div class="empty">Gider yok.</div>'}
   </div>
   ${gel.length ? `<div class="card"><h3>Gelirler</h3>${gel.map(([k,v]) => `<div class="kv"><span>${kat(k).ikon} ${esc(kat(k).ad)}</span><b>${TL(v)}</b></div>`).join('')}</div>` : ''}
-  <div class="card"><h3>Kimin için</h3>${Object.entries(kisi).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `<div class="kv"><span>${esc(k)}</span><b>${TL(v)}</b></div>`).join('') || '<div class="muted small">—</div>'}
-    <h3 style="margin-top:14px">Ödeme şekli</h3>${Object.entries(odeme).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `<div class="kv"><span>${esc(k)}</span><b>${TL(v)}</b></div>`).join('') || '<div class="muted small">—</div>'}
-  </div>`;
+  ${Object.keys(kisi).length > 1 ? `<div class="card"><h3>Kimin için</h3>${Object.entries(kisi).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `<div class="kv"><span>${esc(k)}</span><b>${TL(v)}</b></div>`).join('')}</div>` : ''}`;
 }
-function yilVerisi(y){
-  const aylar = [];
-  for (let m=0;m<12;m++){ const p={y,m}, [s,e] = donemAralik(p), l = islemlerArasi(s,e); aylar.push({m, l, o: ozet(l)}); }
-  return aylar;
-}
+function yilVerisi(y){ const a = []; for (let m=0;m<12;m++){ const [s,e] = donemAralik({y,m}), l = islemlerArasi(s,e); a.push({m, l, o: ozet(l)}); } return a; }
 function raporYil(){
-  const y = secili.y, aylar = yilVerisi(y), tot = ozet(aylar.flatMap(a=>a.l));
-  const max = Math.max(1, ...aylar.map(a => Math.max(a.o.gider, a.o.gelir)));
-  const katlar = katDagilim(aylar.flatMap(a=>a.l));
+  const y = secili.y, aylar = yilVerisi(y), hepsi = aylar.flatMap(a=>a.l), tot = ozet(hepsi);
+  const max = Math.max(1, ...aylar.map(a => Math.max(a.o.gider, a.o.gelir))), katlar = katDagilim(hepsi);
   return `
   <div class="card"><div class="trio">
     <div class="pill out"><small>${y} gider</small><b>${TLk(tot.gider)}</b></div>
     <div class="pill in"><small>${y} gelir</small><b>${TLk(tot.gelir)}</b></div></div>
-    <div class="kv" style="margin-top:10px"><span class="muted">Aylık ortalama gider</span><b>${TL(tot.gider / Math.max(1, aylar.filter(a=>a.o.gider).length))}</b></div>
-  </div>
+    <div class="kv" style="margin-top:10px"><span class="muted">Aylık ortalama gider</span><b>${TL(tot.gider / Math.max(1, aylar.filter(a=>a.o.gider).length))}</b></div></div>
   <div class="card"><h3>Aylara göre</h3>
     <div class="legend"><span><i style="background:var(--gider)"></i>Gider</span><span><i style="background:var(--gelir)"></i>Gelir</span></div>
     <div class="mbars">${aylar.map(a => `<div class="m" title="${AYLAR[a.m]} — Gider ${TL(a.o.gider)} · Gelir ${TL(a.o.gelir)}">
       <div class="pair"><i style="height:${a.o.gider/max*100}%;background:var(--gider)"></i><i style="height:${a.o.gelir/max*100}%;background:var(--gelir)"></i></div><small>${AYK[a.m]}</small></div>`).join('')}</div>
     <div class="scroll" style="margin-top:12px"><table class="t"><tr><th>Ay</th><th class="n">Gelir</th><th class="n">Gider</th><th class="n">Net</th></tr>
       ${aylar.filter(a=>a.l.length).map(a => `<tr><td>${AYLAR[a.m]}</td><td class="n">${TL(a.o.gelir)}</td><td class="n">${TL(a.o.gider)}</td><td class="n" style="color:${a.o.net<0?'var(--gider)':'var(--gelir)'}">${TL(a.o.net)}</td></tr>`).join('')}
-      <tr class="tot"><td>Toplam</td><td class="n">${TL(tot.gelir)}</td><td class="n">${TL(tot.gider)}</td><td class="n">${TL(tot.net)}</td></tr></table></div>
-  </div>
+      <tr class="tot"><td>Toplam</td><td class="n">${TL(tot.gelir)}</td><td class="n">${TL(tot.gider)}</td><td class="n">${TL(tot.net)}</td></tr></table></div></div>
   <div class="card"><h3>Kategori × ay</h3><div class="scroll"><table class="t">
     <tr><th>Kategori</th>${AYK.map(a=>`<th class="n">${a}</th>`).join('')}<th class="n">Toplam</th></tr>
     ${katlar.map(([k,v]) => `<tr><td>${kat(k).ikon} ${esc(kat(k).ad)}</td>${aylar.map(a => { const t = a.l.filter(x=>x.tur==='gider'&&x.kat===k).reduce((s,x)=>s + +x.tutar,0); return `<td class="n">${t?nf.format(Math.round(t)):'<span class="muted">·</span>'}</td>`; }).join('')}<td class="n"><b>${nf.format(Math.round(v))}</b></td></tr>`).join('')}
   </table></div></div>`;
 }
 
-/* ---------- DURUM (varlık / borç / alacak) ---------- */
-const DTIP = {varlik:['Varlıklar','💰','Banka hesapları, nakit, birikim'], borc:['Borçlar','🧾','Kredi, kredi kartı, avans hesap, taksitler'], alacak:['Alacaklar','🤝','Başkasında olan paramız']};
-function durumSayfa(){
-  const d = live(db.durum), top = t => d.filter(x=>x.tip===t).reduce((a,x)=>a + +x.tutar, 0);
-  const net = top('varlik') + top('alacak') - top('borc');
-  return `
-  <div class="card hero"><div class="lbl">Net durum (varlık + alacak − borç)</div>
-    <div class="net" style="color:${net<0?'var(--gider)':'var(--ink)'}">${TL(net)}</div></div>
-  ${Object.entries(DTIP).map(([t,[ad,ik,acik]]) => `
-  <div class="card"><h3>${ik} ${ad} <span style="float:right;color:var(--ink);text-transform:none;letter-spacing:0">${TL(top(t))}</span></h3>
-    ${d.filter(x=>x.tip===t).sort((a,b)=>b.tutar-a.tutar).map(x => `<div class="li" ${isAdmin()?`onclick="durumFormu('${x.id}')" style="cursor:pointer"`:''}>
-      <div class="grow"><div>${esc(x.ad)}</div>${x.not?`<div class="small muted">${esc(x.not)}</div>`:''}</div><b>${TL(x.tutar)}</b></div>`).join('') || `<div class="small muted">${acik}</div>`}
-    ${isAdmin() ? `<div style="margin-top:8px"><button class="btn ghost sm" onclick="durumFormu(null,'${t}')">+ Ekle</button></div>` : ''}
-  </div>`).join('')}
-  ${d.length ? `<p class="small muted" style="text-align:center">Son güncelleme: ${new Date(Math.max(...d.map(x=>x.u))).toLocaleDateString('tr-TR')}</p>` : ''}`;
-}
-function durumFormu(id, tip){
-  const x = id ? db.durum.find(d=>d.id===id) : {id:uid(), tip, ad:'', tutar:'', not:''};
-  sheet(`<h2>${DTIP[x.tip][1]} ${DTIP[x.tip][0]}</h2>
-    <label class="f">Ad</label><input class="i" id="dAd" value="${esc(x.ad)}" placeholder="ör. Garanti hesap, Denizbank kredi">
-    <label class="f">Tutar (₺)</label><input class="i" id="dTut" inputmode="decimal" value="${x.tutar!==''?nf2.format(x.tutar):''}">
-    <label class="f">Not</label><input class="i" id="dNot" value="${esc(x.not)}" placeholder="ör. 8 taksit kaldı, limit 350.000">
-    <div class="btns">${id?`<button class="btn red" onclick="sil('durum','${id}');kapat();degisti()">Sil</button>`:''}<button class="btn" id="dKay">Kaydet</button></div>`);
-  $('#dKay').onclick = () => { const t = parseAmt($('#dTut').value); if (!$('#dAd').value.trim() || isNaN(t)) return toast('Ad ve tutar gerekli');
-    upsert('durum', {...x, ad:$('#dAd').value.trim(), tutar:t, not:$('#dNot').value.trim()}); kapat(); degisti(); };
-}
-
 /* ---------- KAYIT FORMU ---------- */
 let fTur = 'gider', fKat = '', fKisi = 'Ortak', fOdeme = 'Kredi Kartı';
+function kuralBul(metin){ const m = trUp(metin); let best = null; for (const [k,c] of KURAL) if (m.includes(k) && (!best || k.length > best[0].length)) best = [k,c]; return best ? best[1] : ''; }
 function islemFormu(id){
   const x = id ? db.islemler.find(i=>i.id===id) : null;
-  if (x && !isAdmin()){ // izleyici: yalnız göster
-    const c = kat(x.kat);
+  if (x && !isAdmin()){ const c = kat(x.kat);
     return sheet(`<h2>${c.ikon} ${esc(x.acik||c.ad)}</h2>
       <div class="kv"><span class="muted">Tutar</span><b class="amt ${x.tur==='gelir'?'in':'out'}">${TL(x.tutar)}</b></div>
       <div class="kv"><span class="muted">Tarih</span><b>${fmtDate(x.t)}</b></div><div class="kv"><span class="muted">Kategori</span><b>${esc(c.ad)}</b></div>
       <div class="kv"><span class="muted">Kimin için</span><b>${esc(x.kisi||'Ortak')}</b></div><div class="kv"><span class="muted">Ödeme</span><b>${esc(x.odeme||'—')}</b></div>
-      ${x.not?`<p class="small">${esc(x.not)}</p>`:''}<div class="btns"><button class="btn ghost" onclick="kapat()">Kapat</button></div>`);
-  }
+      ${x.not?`<p class="small">${esc(x.not)}</p>`:''}<div class="btns"><button class="btn ghost" onclick="kapat()">Kapat</button></div>`); }
   fTur = x?.tur || 'gider'; fKat = x?.kat || ''; fKisi = x?.kisi || 'Ortak'; fOdeme = x?.odeme || 'Kredi Kartı';
   const ciz = () => {
     const kats = live(db.kategoriler).filter(k => k.tur === fTur);
     if (!kats.some(k=>k.id===fKat)) fKat = '';
     $('#fBody').innerHTML = `
       <div class="seg gg"><button class="out ${fTur==='gider'?'on':''}" data-t="gider">Gider</button><button class="in ${fTur==='gelir'?'on':''}" data-t="gelir">Gelir</button></div>
-      <input class="i amtin" id="fTut" inputmode="decimal" placeholder="0 ₺" value="${x?nf2.format(Math.abs(x.tutar)):($('#fTut')?.value||'')}">
-      ${x && x.tutar < 0 ? '<div class="small muted" style="text-align:center">Bu bir iade kaydı (gideri azaltır)</div>' : ''}
+      <input class="i amtin" id="fTut" inputmode="decimal" placeholder="0 ₺" value="${x ? nf2.format(Math.abs(x.tutar)) : ($('#fTut')?.value||'')}">
+      ${x?.plan ? '<div class="small muted" style="text-align:center">Bu kayıt bir ödeme planından geliyor.</div>' : ''}
       <label class="f">Kategori</label><div class="chips" id="fKats">${kats.map(k=>`<button class="chip ${fKat===k.id?'on':''}" data-k="${k.id}">${k.ikon} ${esc(k.ad)}</button>`).join('')}</div>
-      <label class="f">Açıklama</label><input class="i" id="fAc" list="acList" placeholder="ör. Migros, elektrik faturası" value="${esc(x?.acik || $('#fAc')?.value || '')}">
+      <label class="f">Açıklama</label><input class="i" id="fAc" list="acList" placeholder="ör. Migros, Arya ayakkabı" value="${esc(x?.acik || $('#fAc')?.value || '')}">
       <div class="row2"><div><label class="f">Tarih</label><input class="i" type="date" id="fTar" value="${x?.t || $('#fTar')?.value || today()}"></div>
-      ${fTur==='gider' && !x ? `<div><label class="f">Taksit</label><select class="i" id="fTak">${[1,2,3,4,5,6,8,9,10,12].map(n=>`<option value="${n}">${n===1?'Peşin':n+' taksit'}</option>`).join('')}</select></div>` : '<div></div>'}</div>
+      ${fTur==='gider' && !x ? `<div><label class="f">Taksit</label><select class="i" id="fTak">${[1,2,3,4,5,6,8,9,10,12,18,24].map(n=>`<option value="${n}">${n===1?'Peşin':n+' taksit'}</option>`).join('')}</select></div>` : '<div></div>'}</div>
+      <div id="fTakNot" class="small muted" style="display:none;margin-top:6px">Taksitli alışveriş <b>Ödemeler</b>'e plan olarak eklenir; ilk taksit bu ay ödendi sayılır, kalanları her ay işaretlersin.</div>
       <label class="f">Kimin için</label><div class="chips" id="fKisi">${db.ayar.kisiler.map(k=>`<button class="chip ${fKisi===k?'on':''}" data-v="${esc(k)}">${esc(k)}</button>`).join('')}</div>
       ${fTur==='gider' ? `<label class="f">Ödeme</label><div class="chips" id="fOd">${ODEME.map(k=>`<button class="chip ${fOdeme===k?'on':''}" data-v="${k}">${k}</button>`).join('')}</div>` : ''}
       <label class="f">Not</label><input class="i" id="fNot" value="${esc(x?.not||'')}">
       <div class="btns">${x?`<button class="btn red" id="fSil">Sil</button>`:''}<button class="btn" id="fKay">${x?'Güncelle':'Kaydet'}</button></div>`;
     document.querySelectorAll('#fBody .seg button').forEach(b => b.onclick = () => { fTur = b.dataset.t; ciz(); });
-    document.querySelectorAll('#fKats .chip').forEach(b => b.onclick = () => { fKat = b.dataset.k; document.querySelectorAll('#fKats .chip').forEach(c=>c.classList.toggle('on', c===b)); });
-    document.querySelectorAll('#fKisi .chip').forEach(b => b.onclick = () => { fKisi = b.dataset.v; document.querySelectorAll('#fKisi .chip').forEach(c=>c.classList.toggle('on', c===b)); });
-    document.querySelectorAll('#fOd .chip').forEach(b => b.onclick = () => { fOdeme = b.dataset.v; document.querySelectorAll('#fOd .chip').forEach(c=>c.classList.toggle('on', c===b)); });
-    $('#fAc').oninput = e => { if (fKat) return; const k = kuralBul(e.target.value); if (k && kat(k).tur===fTur){ fKat = k; document.querySelectorAll('#fKats .chip').forEach(c=>c.classList.toggle('on', c.dataset.k===k)); } };
+    const tek = (sel, set) => document.querySelectorAll(sel + ' .chip').forEach(b => b.onclick = () => { set(b.dataset.k || b.dataset.v); document.querySelectorAll(sel + ' .chip').forEach(c => c.classList.toggle('on', c === b)); });
+    tek('#fKats', v => fKat = v); tek('#fKisi', v => fKisi = v); tek('#fOd', v => fOdeme = v);
+    $('#fAc').oninput = e => { const k = kuralBul(e.target.value); if (k && kat(k).tur === fTur){ fKat = k; document.querySelectorAll('#fKats .chip').forEach(c => c.classList.toggle('on', c.dataset.k === k)); } };
+    if ($('#fTak')) $('#fTak').onchange = e => $('#fTakNot').style.display = +e.target.value > 1 ? '' : 'none';
     if (x) $('#fSil').onclick = () => { if (confirm('Bu kayıt silinsin mi?')){ sil('islemler', x.id); kapat(); degisti(); toast('Silindi'); } };
     $('#fKay').onclick = () => {
-      let t = parseAmt($('#fTut').value);
-      if (!(t > 0)) return toast('Tutarı gir');
-      if (!fKat) return toast('Kategori seç');
-      if (x && x.tutar < 0) t = -t;
+      const t = parseAmt($('#fTut').value);
+      if (!(t > 0)) return toast('Tutarı gir'); if (!fKat) return toast('Kategori seç');
       const base = {tur:fTur, kat:fKat, acik:$('#fAc').value.trim(), kisi:fKisi, odeme: fTur==='gider'?fOdeme:'', not:$('#fNot').value.trim()};
       const tarih = $('#fTar').value || today();
-      if (x){ upsert('islemler', {...x, ...base, tutar:t, t:tarih}); }
-      else {
-        const n = +($('#fTak')?.value || 1);
-        if (n > 1){
-          const g = uid(), pay = Math.round(t / n * 100) / 100;
-          for (let i=0;i<n;i++){ const d = new Date(tarih+'T12:00'); d.setMonth(d.getMonth()+i);
-            upsert('islemler', {...base, id:uid(), grup:g, t:iso(d), tutar: i===n-1 ? Math.round((t - pay*(n-1))*100)/100 : pay, acik:(base.acik||kat(fKat).ad) + ` (${i+1}/${n})`}); }
-        } else upsert('islemler', {...base, id:uid(), t:tarih, tutar:t});
+      if (x){ upsert('islemler', {...x, ...base, tutar:t, t:tarih}); kapat(); degisti(); return toast('Güncellendi'); }
+      const n = +($('#fTak')?.value || 1);
+      if (n > 1){ // taksit planı
+        const bas = ayKey(donemOf(tarih)), pay = Math.round(t / n * 100) / 100;
+        const pl = {id:uid(), tip:'taksit', ad: base.acik || kat(fKat).ad, kat:fKat, tutar:pay, bas, bit: ayKey(kaydir(keyP(bas), n-1)), aylar:[], odeme:fOdeme, kisi:fKisi, not:'Toplam ' + TL(t) + ', ' + n + ' taksit'};
+        upsert('planlar', pl); planOde(pl, bas, pay, tarih, fOdeme);
+        kapat(); degisti(); return toast(n + ' taksitlik plan oluşturuldu 🍐');
       }
-      kapat(); degisti(); toast(x ? 'Güncellendi' : 'Kaydedildi 🍐');
+      upsert('islemler', {...base, id:uid(), t:tarih, tutar:t}); kapat(); degisti(); toast('Kaydedildi 🍐');
     };
   };
   sheet(`<h2>${x?'Kaydı düzenle':'Yeni kayıt'}</h2><div id="fBody"></div>
-    <datalist id="acList">${[...new Set(live(db.islemler).slice(-300).map(i=>i.acik).filter(Boolean).map(a=>a.replace(/ \(\d+\/\d+\)$/,'')))].slice(0,80).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>`);
-  ciz();
-  if (!x) setTimeout(() => $('#fTut')?.focus(), 250);
-}
-function kuralBul(metin){
-  const m = trUp(metin); if (!m) return '';
-  let best = null;
-  for (const r of live(db.kurallar)){ const k = trUp(r.k); if (k && m.includes(k) && (!best || k.length > trUp(best.k).length)) best = r; }
-  return best ? best.kat : '';
-}
-
-/* ---------- sabit giderler (toplu) ---------- */
-function sabitFormu(){
-  const [s,e] = donemAralik(secili), list = islemlerArasi(s,e);
-  const [ps,pe] = donemAralik(kaydir(secili,-1)), onceki = islemlerArasi(ps,pe);
-  const sab = live(db.sabitler);
-  sheet(`<h2>📅 Sabit giderler</h2><p class="small muted" style="margin:0 0 8px">${donemAd(secili)} · Geçen dönemin tutarları önerilir. Boş bırakılanlar eklenmez.</p>
-    <label class="f">Tarih</label><input class="i" type="date" id="sTar" value="${s <= today() && today() <= e ? today() : s}">
-    ${sab.map(x => { const var_ = list.find(i=>i.sabit===x.id), pr = onceki.find(i=>i.sabit===x.id);
-      const oneri = pr ? pr.tutar : (x.tutar || '');
-      return `<div class="li"><div class="grow"><div>${kat(x.kat).ikon} ${esc(x.ad)}</div><div class="small muted">${var_?'✔ bu dönem eklendi: '+TL(var_.tutar):(pr?'geçen dönem '+TL(pr.tutar):'')}</div></div>
-      <input class="i" style="width:120px;text-align:right" inputmode="decimal" data-s="${x.id}" ${var_?'disabled':''} value="${!var_ && oneri ? nf2.format(oneri) : ''}" placeholder="—"></div>`; }).join('')}
-    <div class="btns"><button class="btn ghost" onclick="kapat()">Vazgeç</button><button class="btn" id="sKay">Ekle</button></div>`);
-  $('#sKay').onclick = () => { let n = 0; const t = $('#sTar').value || s;
-    document.querySelectorAll('[data-s]').forEach(inp => { const v = parseAmt(inp.value); if (inp.disabled || !(v>0)) return;
-      const x = sab.find(z=>z.id===inp.dataset.s);
-      upsert('islemler', {id:uid(), tur:'gider', kat:x.kat, acik:x.ad, t, tutar:v, kisi:'Ortak', odeme:'Banka', sabit:x.id}); n++; });
-    kapat(); degisti(); toast(n + ' sabit gider eklendi'); };
+    <datalist id="acList">${[...new Set(live(db.islemler).slice(-400).filter(i=>!i.plan).map(i=>i.acik).filter(Boolean))].slice(-80).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>`);
+  ciz(); if (!x) setTimeout(() => $('#fTut')?.focus(), 250);
 }
 
 /* ---------- AYARLAR ---------- */
 function ayarSayfa(){
-  const a = db.ayar, ad = isAdmin();
-  const dis = ad ? '' : 'disabled';
+  const a = db.ayar, ad = isAdmin(), dis = ad ? '' : 'disabled';
   return `
-  <div class="card"><h3>Hesap</h3>
-    <div class="kv"><span>Rol</span><span class="badge">${ad ? 'Yönetici' : 'İzleyici'}</span></div>
-    <div class="kv"><span>Veri</span><b class="small">${syncAktif() ? esc(cfg.owner)+'/'+esc(cfg.repo) : 'Yalnız bu cihaz'}</b></div>
+  <div class="card"><h3>${ad ? 'Google Drive' : 'Paylaşım'}</h3>
+    ${ad ? `<div class="kv"><span>Durum</span><b class="small">${tokOk() ? '✅ Bağlı — Drive / Armut klasörü' : cfg.gBagli ? '⏸ Oturum yenilenmeli' : 'Bağlı değil'}</b></div>`
+         : `<div class="kv"><span>Rol</span><span class="badge">İzleyici</span></div><p class="small muted" style="margin:4px 0 0">Yöneticinin girdiği verileri görürsün. Uygulamayı açınca ya da üstteki “Güncel”e dokununca yenilenir.</p>`}
     ${cfg.sonSync ? `<div class="kv"><span>Son eşitleme</span><span class="small">${new Date(cfg.sonSync).toLocaleString('tr-TR')}</span></div>` : ''}
-    <div class="btns">${syncAktif()?'<button class="btn" onclick="esitle()">Şimdi eşitle</button>':''}</div>
-  </div>
-  <div class="card"><h3>Genel</h3>
-    <label class="f">Aylık bütçe hedefi (₺, 0 = kapalı)</label><input class="i" ${dis} inputmode="decimal" value="${a.butce?nf2.format(a.butce):''}" onchange="db.ayar.butce=parseAmt(this.value)||0;db.ayar.u=now();degisti()">
-    <label class="f">Dönem başlangıç günü (kredi kartı kesim günü gibi)</label>
-    <select class="i" ${dis} onchange="db.ayar.donemGun=+this.value;db.ayar.u=now();secili=null;degisti()">${Array.from({length:28},(_,i)=>`<option ${a.donemGun===i+1?'selected':''} value="${i+1}">${i===0?'Ayın 1’i (takvim ayı)':'Her ayın '+(i+1)+'’i'}</option>`).join('')}</select>
-    <label class="f">Aile üyeleri (virgülle)</label><input class="i" ${dis} value="${esc(a.kisiler.join(', '))}" onchange="db.ayar.kisiler=this.value.split(',').map(s=>s.trim()).filter(Boolean);if(!db.ayar.kisiler.length)db.ayar.kisiler=['Ortak'];db.ayar.u=now();degisti()">
+    <div class="btns">${ad ? (tokOk() ? '<button class="btn" onclick="esitle()">Şimdi eşitle</button>' : '<button class="btn" onclick="driveBaglan()">Drive’a bağlan</button>') : '<button class="btn" onclick="esitle()">Yenile</button>'}</div>
+    ${ad && tokOk() ? '<div class="btns"><button class="btn ghost" onclick="paylasFormu()">📲 Eşime bağlantı gönder</button></div>' : ''}
+    ${ad && cfg.gBagli ? '<p class="small muted" style="text-align:center;margin:10px 0 0"><a href="#" onclick="event.preventDefault();if(confirm(\'Drive bağlantısı bu cihazda kesilsin mi? Drive’daki veri silinmez.\'))driveKes()">Bağlantıyı kes</a></p>' : ''}
   </div>
   ${ad ? `
-  <div class="card"><h3>Listeler</h3>
-    <details class="ac"><summary>🏷️ Kategoriler (${live(db.kategoriler).length})</summary>${listeDuzen('kategoriler')}</details>
-    <details class="ac"><summary>📅 Sabit giderler (${live(db.sabitler).length})</summary>${listeDuzen('sabitler')}</details>
-    <details class="ac"><summary>🔎 Otomatik kategori kuralları (${live(db.kurallar).length})</summary>${listeDuzen('kurallar')}</details>
+  <div class="card"><h3>Genel</h3>
+    <label class="f">Aylık bütçe hedefi (₺, boş = kapalı)</label><input class="i" ${dis} inputmode="decimal" value="${a.butce?nf2.format(a.butce):''}" onchange="db.ayar.butce=parseAmt(this.value)||0;db.ayar.u=now();degisti()">
+    <label class="f">Ay başlangıç günü</label>
+    <select class="i" ${dis} onchange="db.ayar.donemGun=+this.value;db.ayar.u=now();secili=null;degisti()">${Array.from({length:28},(_,i)=>`<option ${a.donemGun===i+1?'selected':''} value="${i+1}">${i===0?'Ayın 1’i (takvim ayı)':'Her ayın '+(i+1)+'’i (ör. kart kesim günü)'}</option>`).join('')}</select>
+    <label class="f">Aile üyeleri (virgülle)</label><input class="i" ${dis} value="${esc(a.kisiler.join(', '))}" onchange="db.ayar.kisiler=this.value.split(',').map(s=>s.trim()).filter(Boolean);if(!db.ayar.kisiler.length)db.ayar.kisiler=['Ortak'];db.ayar.u=now();degisti()">
   </div>
-  <div class="card"><h3>İçe aktar</h3>
-    <button class="btn ghost" onclick="ekstreFormu()">📋 Ekstreden yapıştır (Excel / banka)</button>
-    <div style="height:8px"></div>
-    <button class="btn ghost" onclick="dosyaSec()">📂 Yedek / ilk veri dosyası yükle (.json)</button>
-  </div>` : ''}
-  <div class="card"><h3>Yedek</h3>
+  <div class="card"><details class="ac" style="border:0;padding:0"><summary>🏷️ Kategoriler (${live(db.kategoriler).length})</summary>
+    ${live(db.kategoriler).map(k => `<div class="li"><input class="i" style="width:52px;text-align:center" value="${k.ikon}" onchange="katGuncelle('${k.id}','ikon',this.value)">
+      <input class="i grow" value="${esc(k.ad)}" onchange="katGuncelle('${k.id}','ad',this.value)"><span class="small muted">${k.tur}</span>
+      <button class="x" onclick="if(confirm('Kategori silinsin mi? Eski kayıtlar korunur.')){sil('kategoriler','${k.id}');degisti()}">✕</button></div>`).join('')}
+    <div class="btns"><button class="btn ghost sm" onclick="yeniKat('gider')">+ Gider kategorisi</button><button class="btn ghost sm" onclick="yeniKat('gelir')">+ Gelir kategorisi</button></div></details></div>
+  <div class="card"><h3>Veri</h3>
+    <button class="btn ghost" onclick="dosyaSec()">📂 İlk veri / yedek dosyası yükle (.json)</button><div style="height:8px"></div>
     <button class="btn ghost" onclick="yedekIndir()">💾 Yedek indir (.json)</button>
-    <p class="small muted" style="margin:8px 0 0">Yedek dosyası şifresizdir; güvenli bir yerde (ör. Drive) sakla.</p>
-  </div>
-  <div class="card"><button class="btn ghost" onclick="yoneticiFormu()">🔑 ${ad ? 'Yönetici ayarları' : 'Yönetici girişi'}</button>
-  <p class="small muted" style="text-align:center;margin:10px 0 0">Armut v${VER}</p></div>`;
+    <p class="small muted" style="margin:8px 0 0">Drive'a bağlıyken her gün Armut klasörüne otomatik yedek de alınır.</p></div>` : ''}
+  <p class="small muted" style="text-align:center">Armut v${VER}</p>`;
 }
-function listeDuzen(tip){
-  const L = live(db[tip]);
-  const katOpt = (sel, tur) => live(db.kategoriler).filter(k=>!tur||k.tur===tur).map(k=>`<option value="${k.id}" ${sel===k.id?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('');
-  const u = (id, alan, ifade) => `onchange="(function(el){const x=db.${tip}.find(z=>z.id==='${id}');x.${alan}=${ifade};x.u=now();degisti()})(this)"`;
-  if (tip === 'kategoriler') return L.map(k => `<div class="li"><input class="i" style="width:52px;text-align:center" value="${k.ikon}" ${u(k.id,'ikon','el.value')}>
-      <input class="i grow" value="${esc(k.ad)}" ${u(k.id,'ad','el.value')}><span class="small muted">${k.tur}</span><button class="x" onclick="if(confirm('Kategori silinsin mi? Eski kayıtlar korunur.')){sil('kategoriler','${k.id}');degisti()}">✕</button></div>`).join('')
-    + `<div class="btns"><button class="btn ghost sm" onclick="yeniKat('gider')">+ Gider kategorisi</button><button class="btn ghost sm" onclick="yeniKat('gelir')">+ Gelir kategorisi</button></div>`;
-  if (tip === 'sabitler') return L.map(s => `<div class="li"><input class="i grow" value="${esc(s.ad)}" ${u(s.id,'ad','el.value')}>
-      <select class="i" style="width:130px" ${u(s.id,'kat','el.value')}>${katOpt(s.kat,'gider')}</select>
-      <input class="i" style="width:90px;text-align:right" inputmode="decimal" value="${s.tutar?nf2.format(s.tutar):''}" placeholder="tutar" ${u(s.id,'tutar','parseAmt(el.value)||0')}>
-      <button class="x" onclick="sil('sabitler','${s.id}');degisti()">✕</button></div>`).join('')
-    + `<div class="btns"><button class="btn ghost sm" onclick="upsert('sabitler',{id:uid(),ad:'Yeni sabit gider',kat:'fatura',tutar:0});degisti()">+ Sabit gider</button></div>`;
-  return `<p class="small muted">Açıklamada bu kelime geçerse kategori otomatik seçilir (ekstre aktarımında da).</p>` + L.map(r => `<div class="li"><input class="i grow" value="${esc(r.k)}" ${u(r.id,'k','el.value')}>
-      <select class="i" style="width:150px" ${u(r.id,'kat','el.value')}>${katOpt(r.kat)}</select><button class="x" onclick="sil('kurallar','${r.id}');degisti()">✕</button></div>`).join('')
-    + `<div class="btns"><button class="btn ghost sm" onclick="upsert('kurallar',{id:uid(),k:'',kat:'diger'});degisti()">+ Kural</button></div>`;
-}
+function katGuncelle(id, alan, v){ const k = db.kategoriler.find(z => z.id === id); k[alan] = v; k.u = now(); degisti(); }
 function yeniKat(tur){ const ad = prompt('Kategori adı:'); if (!ad) return; const ikon = prompt('Simge (emoji):', tur==='gider'?'🏷️':'💵') || '🏷️';
   upsert('kategoriler', {id: 'k' + uid(), ad, ikon, tur}); degisti(); }
-/* ---------- ekstreden yapıştır ---------- */
-let ekstre = [];
-function ekstreFormu(){
-  sheet(`<h2>📋 Ekstreden yapıştır</h2>
-    <p class="small muted" style="margin-top:0">Excel'den <b>Tarih · Açıklama · Tutar</b> sütunlarını seçip kopyala, buraya yapıştır. Eksi (−) tutarlar gider, “İADE” içeren artılar iade, diğer artılar gelir sayılır.</p>
-    <textarea class="i" id="eT" rows="7" placeholder="27/10/2026	DERİN TEKEL BÜFE	-2495"></textarea>
-    <div class="btns"><button class="btn" id="eOk">Önizle</button></div><div id="eOn"></div>`);
-  $('#eOk').onclick = () => {
-    ekstre = [];
-    const var_ = new Set(live(db.islemler).map(x => x.t + '|' + Math.abs(x.tutar).toFixed(2) + '|' + trUp(x.acik).slice(0,20)));
-    for (const satir of $('#eT').value.split(/\r?\n/)){
-      if (!satir.trim()) continue;
-      let p = satir.split('\t').map(s=>s.trim()).filter(s=>s!=='');
-      if (p.length < 3){ const m = satir.match(/^\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(.+?)\s+(-?[\d.,]+)\s*(TL|₺)?\s*$/i); if (m) p = [m[1], m[2], m[3]]; }
-      const dm = (p[0]||'').match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/); if (!dm) continue;
-      const y = dm[3].length===2 ? '20'+dm[3] : dm[3], t = `${y}-${pad(dm[2])}-${pad(dm[1])}`;
-      const tutar = parseAmt(p[p.length-1]); if (isNaN(tutar) || !tutar) continue;
-      const acik = p.slice(1, -1).join(' ').replace(/^SATIŞ-\d+\*\d+-/i,'').trim();
-      const iade = tutar > 0 && /İADE|IADE|İade|iade/.test(acik);
-      const tur = tutar < 0 || iade ? 'gider' : 'gelir';
-      const k = kuralBul(acik);
-      const kk = k && kat(k).tur === tur ? k : (tur==='gider'?'diger':'gelir-diger');
-      const key = t + '|' + Math.abs(tutar).toFixed(2) + '|' + trUp(acik).slice(0,20);
-      ekstre.push({sec: !var_.has(key), cift: var_.has(key), t, acik, tur, tutar: iade ? -Math.abs(tutar) : Math.abs(tutar), kat: kk, odeme: /\*\d{4}|SATIŞ/i.test(p.slice(1,-1).join(' ')) ? 'Kredi Kartı' : 'Banka'});
-    }
-    ekstreOnizle();
-  };
-}
-function ekstreOnizle(){
-  const opt = (tur, sel) => live(db.kategoriler).filter(k=>k.tur===tur).map(k=>`<option value="${k.id}" ${k.id===sel?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('');
-  $('#eOn').innerHTML = ekstre.length ? `<p class="small"><b>${ekstre.length}</b> satır bulundu · ${ekstre.filter(e=>e.cift).length} tanesi zaten kayıtlı görünüyor (işaretsiz).</p>
-    ${ekstre.map((e,i) => `<div class="li" style="align-items:flex-start"><input type="checkbox" ${e.sec?'checked':''} onchange="ekstre[${i}].sec=this.checked" style="margin-top:12px;width:20px;height:20px">
-      <div class="grow"><div class="small">${fmtDate(e.t)} · <b class="amt ${e.tur==='gelir'?'in':'out'}">${e.tutar<0?'iade ':''}${TL(Math.abs(e.tutar))}</b></div>
-      <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.acik)}</div>
-      <select class="i" style="padding:6px 8px;margin-top:4px" onchange="ekstre[${i}].kat=this.value">${opt(e.tur, e.kat)}</select></div></div>`).join('')}
-    <div class="btns"><button class="btn" onclick="ekstreKaydet()">Seçilenleri kaydet</button></div>` : '<p class="small muted">Satır okunamadı. Tarih gg/aa/yyyy biçiminde olmalı.</p>';
-}
-function ekstreKaydet(){ let n = 0;
-  for (const e of ekstre) if (e.sec){ upsert('islemler', {id:uid(), t:e.t, tur:e.tur, tutar:e.tutar, kat:e.kat, acik:e.acik, kisi:'Ortak', odeme:e.tur==='gider'?e.odeme:''}); n++; }
-  kapat(); degisti(); toast(n + ' kayıt eklendi 🍐'); }
 
-/* ---------- yedek / içe aktar ---------- */
+/* ---------- yedek / ilk veri ---------- */
 function indir(ad, blob){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ad; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000); }
-function yedekIndir(){ indir('armut-yedek-' + today() + '.json', new Blob([JSON.stringify(db, null, 1)], {type:'application/json'})); }
+function yedekIndir(){ indir('armut-yedek-' + today() + '.json', new Blob([JSON.stringify(db)], {type:'application/json'})); }
 function dosyaSec(){ const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
   i.onchange = async () => { try { const j = JSON.parse(await i.files[0].text());
-      if (j.armutIlkVeri){ ilkVeriYukle(j); return; }
+      if (j.armutIlkVeri) return ilkVeriYukle(j);
       if (!j.islemler) throw 0;
       if (!confirm('Yedekteki ' + live(j.islemler).length + ' kayıt mevcut verilerle birleştirilsin mi?')) return;
       db = birlestir(db, j); degisti(); toast('Yedek yüklendi');
     } catch(e){ toast('Dosya okunamadı'); } };
   i.click(); }
 function ilkVeriYukle(j){
-  const varMi = live(db.islemler).some(x => x.kaynak === 'excel');
-  if (varMi && !confirm('Excel aktarımı daha önce yapılmış. Tekrar eklensin mi? (Çift kayıt olabilir)')) return;
-  if (!varMi && !confirm(`Excel dosyandan ${j.islemler.length} aylık toplam kaydı ve ${j.durum.length} varlık/borç/alacak satırı eklensin mi?`)) return;
-  for (const x of j.islemler){ const s = live(db.sabitler).find(z => trUp(z.ad) === trUp(x.acik));
-    upsert('islemler', {...x, id:uid(), kaynak:'excel', ...(s ? {sabit:s.id} : {})}); }
-  for (const d of j.durum) upsert('durum', {...d, id:uid()});
-  for (const s of (j.sabitler||[])){ const v = db.sabitler.find(z=>!z.del && trUp(z.ad)===trUp(s.ad)); if (v){ v.tutar = s.tutar; v.u = now(); } }
-  degisti(); toast('Excel verisi aktarıldı 🍐'); }
+  if (live(db.islemler).some(x => x.kaynak === 'excel') && !confirm('Excel verisi daha önce yüklenmiş. Yine de eklensin mi? (çift kayıt olur)')) return;
+  if (!confirm(`Excel'inden: ${j.planlar.length} ödeme planı, ${j.islemler.length} aylık kayıt ve ${j.durum.length} varlık/alacak eklensin mi?`)) return;
+  const idMap = {};
+  for (const p of j.planlar){ const yeni = uid(); idMap[p.id] = yeni; upsert('planlar', {...p, id: yeni}); }
+  for (const x of j.islemler) upsert('islemler', {...x, id: uid(), kaynak:'excel', ...(x.plan ? {plan: idMap[x.plan]} : {})});
+  for (const d of j.durum) upsert('durum', {...d, id: uid()});
+  degisti(); toast('Excel verisi yüklendi 🍐');
+}
 
 /* ---------- Excel raporu ---------- */
 function xlsxYukle(){ return window.XLSX ? Promise.resolve() : new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload = ok; s.onerror = () => no(new Error('Excel kütüphanesi yüklenemedi (internet?)')); document.head.appendChild(s); }); }
@@ -722,37 +821,29 @@ async function excelIndir(){
   try { await xlsxYukle(); } catch(e){ return toast(e.message); }
   const y = secili.y, yil = raporMod === 'yil';
   const [s,e] = yil ? [donemAralik({y,m:0})[0], donemAralik({y,m:11})[1]] : donemAralik(secili);
-  const list = islemlerArasi(s,e).sort((a,b) => a.t > b.t ? 1 : -1);
-  const wb = XLSX.utils.book_new();
-  const kayit = [['Tarih','Tür','Kategori','Açıklama','Tutar (₺)','Kimin için','Ödeme','Not']].concat(list.map(x => [new Date(x.t+'T12:00'), x.tur==='gelir'?'Gelir':(x.tutar<0?'İade':'Gider'), kat(x.kat).ad, x.acik||'', +x.tutar, x.kisi||'', x.odeme||'', x.not||'']));
-  const ws1 = XLSX.utils.aoa_to_sheet(kayit, {cellDates:true}); ws1['!cols'] = [{wch:11},{wch:7},{wch:22},{wch:40},{wch:12},{wch:12},{wch:12},{wch:20}];
-  ws1['!autofilter'] = {ref: 'A1:H' + kayit.length};
-  for (let r=2;r<=kayit.length;r++){ const c = ws1['E'+r]; if (c) c.z = '#,##0.00'; const d = ws1['A'+r]; if (d) d.z = 'dd.mm.yyyy'; }
-  XLSX.utils.book_append_sheet(wb, ws1, 'Kayıtlar');
-  // kategori × ay (yıl)
-  const aylar = yilVerisi(y), gk = katDagilim(aylar.flatMap(a=>a.l));
-  const pv = [['Kategori', ...AYLAR, 'TOPLAM']];
-  for (const [k] of gk) pv.push([kat(k).ad, ...aylar.map(a => +a.l.filter(x=>x.tur==='gider'&&x.kat===k).reduce((s,x)=>s + +x.tutar,0).toFixed(2)), 0]);
-  pv.push(['GİDER TOPLAM', ...aylar.map(a => +a.o.gider.toFixed(2)), 0]);
-  pv.push(['GELİR TOPLAM', ...aylar.map(a => +a.o.gelir.toFixed(2)), 0]);
-  pv.push(['NET', ...aylar.map(a => +a.o.net.toFixed(2)), 0]);
-  const ws2 = XLSX.utils.aoa_to_sheet(pv);
-  for (let r=2;r<=pv.length;r++){ ws2['N'+r] = {t:'n', f:`SUM(B${r}:M${r})`, z:'#,##0.00'}; for (const c of 'BCDEFGHIJKLM') if (ws2[c+r]) ws2[c+r].z = '#,##0'; }
-  ws2['!cols'] = [{wch:24}, ...Array(13).fill({wch:11})];
-  XLSX.utils.book_append_sheet(wb, ws2, y + ' Kategori-Ay');
-  // sabit giderler (yıl)
-  const sab = live(db.sabitler), sv = [['Sabit gider', ...AYLAR, 'TOPLAM']];
-  for (const x of sab) sv.push([x.ad, ...aylar.map(a => +a.l.filter(i => i.sabit===x.id || (i.tur==='gider' && trUp(i.acik)===trUp(x.ad))).reduce((s,i)=>s + +i.tutar,0).toFixed(2))]);
-  const ws3 = XLSX.utils.aoa_to_sheet(sv); for (let r=2;r<=sv.length;r++) ws3['N'+r] = {t:'n', f:`SUM(B${r}:M${r})`, z:'#,##0.00'};
-  ws3['!cols'] = [{wch:22}, ...Array(13).fill({wch:10})];
-  XLSX.utils.book_append_sheet(wb, ws3, y + ' Sabit Giderler');
-  // durum
-  const d = live(db.durum), dv = [['Tür','Ad','Tutar (₺)','Not']];
-  for (const t of ['varlik','alacak','borc']) for (const x of d.filter(z=>z.tip===t)) dv.push([DTIP[t][0], x.ad, +x.tutar, x.not||'']);
-  dv.push([], ['NET DURUM','', d.reduce((a,x)=>a + (x.tip==='borc'?-1:1) * x.tutar, 0)]);
-  const ws4 = XLSX.utils.aoa_to_sheet(dv); ws4['!cols'] = [{wch:12},{wch:28},{wch:14},{wch:30}];
-  XLSX.utils.book_append_sheet(wb, ws4, 'Borç-Varlık');
-  XLSX.writeFile(wb, `Armut_${yil ? y : donemAd(secili).replace(/[^\wığüşöçİĞÜŞÖÇ]+/g,'_')}.xlsx`);
+  const list = islemlerArasi(s,e).sort((a,b) => a.t > b.t ? 1 : -1), wb = XLSX.utils.book_new(), sayi = '#,##0.00';
+  const k1 = [['Tarih','Tür','Kategori','Açıklama','Tutar (₺)','Kimin için','Ödeme','Not']].concat(list.map(x => [new Date(x.t+'T12:00'), x.tur==='gelir'?'Gelir':'Gider', kat(x.kat).ad, x.acik||'', +x.tutar, x.kisi||'', x.odeme||'', x.not||'']));
+  const w1 = XLSX.utils.aoa_to_sheet(k1, {cellDates:true}); w1['!cols'] = [{wch:11},{wch:7},{wch:22},{wch:36},{wch:12},{wch:12},{wch:12},{wch:20}];
+  w1['!autofilter'] = {ref:'A1:H' + k1.length}; for (let r=2;r<=k1.length;r++){ if (w1['E'+r]) w1['E'+r].z = sayi; if (w1['A'+r]) w1['A'+r].z = 'dd.mm.yyyy'; }
+  XLSX.utils.book_append_sheet(wb, w1, 'Kayıtlar');
+  const aylar = yilVerisi(y), pv = [['Kategori', ...AYLAR, 'TOPLAM']];
+  for (const [k] of katDagilim(aylar.flatMap(a=>a.l))) pv.push([kat(k).ad, ...aylar.map(a => +a.l.filter(x=>x.tur==='gider'&&x.kat===k).reduce((s,x)=>s + +x.tutar,0).toFixed(2))]);
+  pv.push(['GİDER TOPLAM', ...aylar.map(a => +a.o.gider.toFixed(2))], ['GELİR TOPLAM', ...aylar.map(a => +a.o.gelir.toFixed(2))], ['NET', ...aylar.map(a => +a.o.net.toFixed(2))]);
+  const w2 = XLSX.utils.aoa_to_sheet(pv); for (let r=2;r<=pv.length;r++) w2['N'+r] = {t:'n', f:`SUM(B${r}:M${r})`, z:sayi};
+  w2['!cols'] = [{wch:24}, ...Array(13).fill({wch:11})]; XLSX.utils.book_append_sheet(wb, w2, y + ' Kategori-Ay');
+  const P = live(db.planlar), pp = [['Ödeme', 'Tür', ...AYLAR, 'TOPLAM']];
+  for (const p of P){ const satir = [p.ad, PTIP[p.tip][0]];
+    for (let m=0;m<12;m++){ const o = planOdeme(p, ayKey({y,m})); satir.push(o ? +Math.abs(o.tutar).toFixed(2) : ''); } pp.push(satir); }
+  const w3 = XLSX.utils.aoa_to_sheet(pp); for (let r=2;r<=pp.length;r++) w3['O'+r] = {t:'n', f:`SUM(C${r}:N${r})`, z:sayi};
+  w3['!cols'] = [{wch:26},{wch:18}, ...Array(13).fill({wch:10})]; XLSX.utils.book_append_sheet(wb, w3, y + ' Ödemeler');
+  const key = ayKey(donemOf(today())), pl = [['Ödeme','Tür','Kategori','Aylık tutar','Başlangıç','Bitiş','Kalan taksit','Kalan tutar','Not']];
+  for (const p of P){ const k = planKalan(p, key); pl.push([p.ad, PTIP[p.tip][0], kat(p.kat).ad, +p.tutar||'', p.bas||'', p.bit||'süresiz', k ? k.n : '', k ? +k.tutar.toFixed(2) : '', p.not||'']); }
+  const w4 = XLSX.utils.aoa_to_sheet(pl); w4['!cols'] = [{wch:26},{wch:18},{wch:20},{wch:12},{wch:10},{wch:10},{wch:12},{wch:12},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, w4, 'Ödeme Planları');
+  const dv = [['Tür','Ad','Tutar (₺)','Not']];
+  for (const t of ['varlik','alacak','borc']) for (const x of live(db.durum).filter(z=>z.tip===t)) dv.push([DTIP[t][0], x.ad, +x.tutar, x.not||'']);
+  const w5 = XLSX.utils.aoa_to_sheet(dv); w5['!cols'] = [{wch:14},{wch:28},{wch:14},{wch:30}]; XLSX.utils.book_append_sheet(wb, w5, 'Borç-Varlık');
+  XLSX.writeFile(wb, `Armut_${yil ? y : AYLAR[secili.m] + '_' + secili.y}.xlsx`);
 }
 
 /* ---------- alt pencere ---------- */
@@ -763,8 +854,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') kapat(); });
 
 /* ---------- başlat ---------- */
 render();
-if (cfg.rol && syncAktif()) esitle(true);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cfg.rol && syncAktif() && !$('#sheet')) esitle(true); });
+if (VIEWER) esitle(true);
+else { gisYukle().catch(() => {}); if (tokOk()) esitle(true); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !$('#sheet') && (VIEWER || tokOk())) esitle(true); });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
 </script>
 </body>

@@ -1,48 +1,29 @@
 # 🍐 Armut · Aile Bütçesi
 
-Aile içi alışverişler ve gelir–gider takibi. Telefona uygulama gibi kurulur (Android ve iPhone).
+Aile içi harcamalar, gelirler ve takip edilen ödemeler (sabit giderler, kredi kartı taksitleri, banka kredisi, kurs ücretleri).
+YKS-LGS Takip ile aynı düzende çalışır: veriler Google Drive'da tutulur, eşin paylaştığın bağlantıdan görür.
 
-## Yükleme (bir kez)
+## 1. GitHub'a yükle (bir kez)
+1. **armut** deposu → **Add file → Upload files** → bu klasördekilerin hepsini sürükle: `index.html`, `manifest.webmanifest`, `sw.js`, `README.md`, `icons` klasörü → **Commit changes**.
+2. **Settings → Pages** → Branch: `main` / `(root)` → **Save**.
+3. 1–2 dakika sonra uygulama açılır: `https://ilknurturkmen1984-ai.github.io/armut/`
 
-1. GitHub'da **armut** deposunu aç → **Add file → Upload files**.
-2. Bu klasördeki her şeyi sürükle: `index.html`, `manifest.webmanifest`, `sw.js`, `README.md` ve `icons` klasörü → **Commit changes**.
-3. **Settings → Pages** → Source: *Deploy from a branch*, Branch: `main` / `(root)` → **Save**.
-4. 1–2 dakika sonra uygulama şu adreste açılır: `https://KULLANICI-ADIN.github.io/armut/`
+## 2. İlk açılış (senin telefonunda ya da PC'nde)
+1. Uygulamayı aç → **Drive'a bağlan** → YKS-LGS'de kullandığın Google hesabını seç.
+   Drive'ında **Armut** klasörü açılır, veriler oraya kaydedilir; her gün otomatik yedek de alınır.
+2. **İlk veriyi yükle** → `armut-ilk-veri.json` dosyasını seç. Excel'indeki 2026 rakamları ve ödeme planları gelir.
+3. Diğer cihazında (PC ya da telefon) da aynı adresi aç → **Drive'a bağlan**. İki cihaz aynı verileri görür.
 
-> ⚠️ `armut-ilk-veri.json` dosyasını GitHub'a **yükleme**. Bu dosyada Excel'deki rakamlar şifresiz duruyor. Yalnızca uygulamanın içinden yüklenir.
+## 3. Eşinle paylaş (bir kez)
+**Ayarlar → 📲 Eşime bağlantı gönder** → Google API anahtarını yapıştır → **Bağlantıyı oluştur** → WhatsApp ile gönder.
+- API anahtarı YKS-LGS'de kullandığınla aynı: eşine gönderdiğin YKS-LGS bağlantısında `k=` işaretinden sonraki kısım (AIza… ile başlar).
+- Eşin bağlantıyı açar, ana ekrana ekler. Her açtığında senin son girdiğin verileri görür, değiştiremez.
+- Eşinin ekranında "Veri alınamadı (403)" yazarsa: Google Cloud → API anahtarı → Web sitesi kısıtlamalarına `https://ilknurturkmen1984-ai.github.io/*` ekle.
 
-## Yönetici anahtarı (token), yalnız senin için
-
-Verilerin depoya kaydedilebilmesi için GitHub'da bir anahtar oluşturman gerekiyor:
-
-1. GitHub → sağ üst profil → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
-2. Name: `armut` · Expiration: 1 yıl
-3. Repository access: **Only select repositories → armut**
-4. Permissions → Repository permissions → **Contents: Read and write**
-5. **Generate token** → çıkan `github_pat_…` metnini kopyala.
-
-## İlk açılış
-
-**Sende (yönetici):** Yönetici → aile şifresi (eşinle paylaşacağın, en az 10 karakter) → token → Başla.
-Sonra **Ayarlar → Yedek / ilk veri dosyası yükle** ile `armut-ilk-veri.json` dosyasını seç. Excel'deki 2026 aylık toplamları ve borç/varlık/alacak tablosu uygulamaya gelir.
-
-**Eşinin telefonunda:** aynı adresi aç → **Aile üyesi (izleyici)** → aynı aile şifresi → Başla.
-Eşin tüm ekranları görür ve Excel raporu indirebilir, ama kayıt değiştiremez.
-
-**Ana ekrana ekleme:** Android/Chrome'da ⋮ → *Ana ekrana ekle*. iPhone/Safari'de Paylaş → *Ana Ekrana Ekle*.
-
-## Güvenlik
-
-- Veriler depoda `data/armut.enc.json` dosyasında **AES-256 ile şifreli** durur. Depo herkese açık olsa da aile şifresini bilmeyen kimse içeriği okuyamaz.
-- Aile şifresi hiçbir yere gönderilmez. **Şifreyi unutursan veri açılmaz.** Ayarlar → Yedek indir ile ara sıra yedek al.
-- Token yalnız senin cihazlarında saklanır. Eşine token verme.
-
-## Neler var
-
-- **Ana Sayfa:** bu dönemin harcaması, gelir, kalan, bütçe çubuğu, en çok harcanan 5 kategori, son kayıtlar
-- **+ Yeni kayıt:** gider/gelir, kategori, kimin için, ödeme şekli, taksit (taksitler aylara otomatik bölünür)
-- **Sabit giderler:** aidat, faturalar, kredi gibi aylık kalemler tek ekrandan, geçen ayın tutarı önerilerek eklenir
-- **Ekstreden yapıştır:** Excel'deki Tarih · Açıklama · Tutar sütunlarını kopyala-yapıştır yap. Kategoriler anahtar kelimeyle otomatik seçilir (Migros → Online Market, Bilyoner → Şans Oyunu …) ve aynı kayıt iki kez eklenmez
-- **Rapor:** dönem ve yıl görünümü, kategori dağılımı, günlük mutfak maliyeti, önceki aya göre değişim, kategori×ay tablosu, **Excel raporu**
-- **Durum:** varlıklar, borçlar, alacaklar ve net durum
-- **Ayarlar:** bütçe, dönem başlangıç günü (kart kesim günü), aile üyeleri, kategoriler, sabit giderler, kurallar
+## Nasıl kullanılır
+- **+** : harcama ya da gelir gir. Kategori seç, açıklama yaz. Taksit seçersen alışveriş Ödemeler'e plan olarak eklenir.
+- **Ödemeler → Bu ay** : aidat, faturalar, kredi, kart taksitleri, Arya'nın kursu. Ödediğine dokun → **Ödendi**. Gider kaydı kendiliğinden eklenir.
+- **Ödemeler → Planlar** : yeni sabit gider, taksit, kredi, kurs ya da yıllık ödeme (DASK, emlak vergisi) ekle. Kalan taksit ve tutar görünür.
+- **Ödemeler → Borç · Varlık** : banka hesapları, alacaklar, kalan kredi/taksit borcu ve net durum.
+- **Rapor** : ay ve yıl özeti, kategori dağılımı, Excel raporu.
+- Sağ üstteki düğme: **Drive · güncel** yazıyorsa her şey kayıtlı. **Kaydetmek için dokun** yazıyorsa Google oturumu yenilenmeli; dokunman yeterli.

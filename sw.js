@@ -1,5 +1,5 @@
 // Armut service worker — uygulama dosyalarını önbelleğe alır (çevrimdışı açılır)
-const CACHE = 'armut-v1';
+const CACHE = 'armut-v2';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.png'];
 
 self.addEventListener('install', e => {
