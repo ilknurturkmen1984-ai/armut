@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7FA62A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Armut">
+<title>Armut · Aile Bütçesi</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{
+  --bg:#FBF8EF; --card:#FFFFFF; --ink:#22281A; --ink2:#5C6450; --muted:#8C9381; --line:#ECE8DA;
+  --pear:#7FA62A; --pear-d:#55761A; --pear-l:#EEF4D9; --leaf:#4E8A2A;
+  --gider:#C2562F; --gider-l:#FBEAE3; --gelir:#3E8A3A; --gelir-l:#E5F2E3;
+  --bar:#9DBB45; --r:18px; --sh:0 1px 2px rgba(40,50,20,.06),0 4px 16px rgba(40,50,20,.06);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#15180F; --card:#1E2316; --ink:#EEF1E6; --ink2:#B8BFAA; --muted:#868D78; --line:#2E3524;
+  --pear:#A9CB4C; --pear-d:#C4E06A; --pear-l:#2A341A; --gider:#E58463; --gider-l:#3A2219; --gelir:#78C46F; --gelir-l:#1E3320; --bar:#A9CB4C;
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{max-width:720px;margin:0 auto;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 8px;display:flex;align-items:center;gap:10px}
+header .logo{width:34px;height:34px;border-radius:10px}
+header h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.2px}
+header .sp{flex:1}
+.sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:5px 10px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--gelir)}.dot.wait{background:#D6A21E}.dot.err{background:var(--gider)}
+.period{display:flex;align-items:center;justify-content:center;gap:6px;margin:4px 0 14px}
+.period b{min-width:170px;text-align:center;font-weight:600}
+.ib{border:0;background:var(--card);border:1px solid var(--line);width:36px;height:36px;border-radius:12px;cursor:pointer;font-size:18px;line-height:1}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:16px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600}
+.hero{padding:20px}
+.hero .lbl{color:var(--muted);font-size:13px}
+.hero .big{font-size:38px;font-weight:750;letter-spacing:-1px;margin:2px 0 12px}
+.trio{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pill{border-radius:14px;padding:10px 12px}
+.pill small{display:block;font-size:12px;color:var(--ink2)}
+.pill b{font-size:17px}
+.pill.in{background:var(--gelir-l)} .pill.out{background:var(--gider-l)}
+.budget{margin-top:14px}
+.track{height:10px;background:var(--line);border-radius:99px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--pear);border-radius:99px}
+.track i.over{background:var(--gider)}
+.budget .row{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-top:6px}
+.cats .c{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;margin:9px 0}
+.cats .ic{font-size:20px;text-align:center}
+.cats .nm{font-size:14px;display:flex;justify-content:space-between;gap:8px}
+.cats .nm span{color:var(--muted);font-size:12px}
+.cats .v{font-weight:600;font-size:14px;min-width:88px;text-align:right}
+.bar{height:8px;background:var(--line);border-radius:99px;margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--bar);border-radius:0 4px 4px 0}
+.tx{display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.tx:last-child{border-bottom:0}
+.tx .ic{width:38px;height:38px;border-radius:12px;background:var(--pear-l);display:grid;place-items:center;font-size:19px;flex:none}
+.tx .mid{flex:1;min-width:0}
+.tx .t1{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .t2{font-size:12px;color:var(--muted)}
+.tx .amt{font-weight:650;white-space:nowrap}
+.amt.out{color:var(--gider)} .amt.in{color:var(--gelir)}
+.day{font-size:12px;color:var(--muted);margin:14px 2px 2px;font-weight:600}
+.empty{text-align:center;color:var(--muted);padding:26px 10px}
+.fab{position:fixed;right:max(18px,calc(50% - 342px));bottom:calc(84px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:20px;border:0;background:var(--pear);color:#fff;font-size:32px;box-shadow:0 6px 20px rgba(85,118,26,.4);cursor:pointer;z-index:6}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:7}
+nav .in{display:flex;max-width:720px;width:100%}
+nav button{flex:1;border:0;background:none;padding:9px 0 8px;font-size:11px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button .e{font-size:21px;filter:grayscale(1);opacity:.7}
+nav button.on{color:var(--pear-d);font-weight:600}
+nav button.on .e{filter:none;opacity:1}
+.seg{display:flex;background:var(--line);border-radius:12px;padding:3px;gap:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;padding:8px;border-radius:10px;cursor:pointer;font-size:14px;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--sh)}
+.seg.gg button.on.out{color:var(--gider)} .seg.gg button.on.in{color:var(--gelir)}
+label.f{display:block;font-size:12px;color:var(--ink2);margin:10px 0 4px;font-weight:600}
+input.i,select.i,textarea.i{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:11px 12px;outline:none}
+input.i:focus,select.i:focus,textarea.i:focus{border-color:var(--pear)}
+.amtin{font-size:34px;font-weight:700;text-align:center;border:0!important;background:none!important;padding:6px!important}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--pear-l);border-color:var(--pear);color:var(--pear-d);font-weight:600}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:14px;padding:13px 16px;font-weight:650;cursor:pointer;background:var(--pear);color:#fff;width:100%;font-size:15px}
+.btn.ghost{background:var(--line);color:var(--ink)}
+.btn.red{background:var(--gider-l);color:var(--gider)}
+.btn.sm{width:auto;padding:8px 12px;font-size:13px;border-radius:11px}
+.btns{display:flex;gap:10px;margin-top:16px}
+.sheet-bg{position:fixed;inset:0;background:rgba(20,24,12,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center;animation:fd .15s}
+.sheet{background:var(--card);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));animation:up .2s}
+.sheet .grab{width:42px;height:5px;background:var(--line);border-radius:9px;margin:0 auto 10px}
+.sheet h2{margin:0 0 6px;font-size:18px}
+@keyframes up{from{transform:translateY(40px);opacity:.4}} @keyframes fd{from{opacity:0}}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:6px 6px;border-bottom:1px solid var(--line)}
+table.t td{padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums}
+table.t tr.tot td{font-weight:700;border-bottom:0}
+.scroll{overflow-x:auto;margin:0 -6px;padding:0 6px}
+.muted{color:var(--muted)} .small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.li:last-child{border-bottom:0}
+.li .grow{flex:1;min-width:0}
+.li .x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px}
+.net{font-size:30px;font-weight:750;letter-spacing:-.6px}
+.toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:40;box-shadow:var(--sh);animation:fd .2s;max-width:90vw;text-align:center}
+.welcome{min-height:100vh;display:flex;flex-direction:column;justify-content:center;max-width:420px;margin:0 auto;padding:24px}
+.welcome img{width:96px;height:96px;margin:0 auto 10px;display:block;border-radius:24px;box-shadow:var(--sh)}
+.welcome h1{text-align:center;margin:0}
+.welcome p{text-align:center;color:var(--ink2)}
+.kv{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
+.badge{font-size:11px;background:var(--pear-l);color:var(--pear-d);padding:2px 8px;border-radius:99px;font-weight:600}
+details.ac{border-top:1px solid var(--line);padding:10px 0}
+details.ac summary{cursor:pointer;font-weight:600;list-style:none}
+details.ac summary::after{content:"›";float:right;color:var(--muted);transition:.2s}
+details.ac[open] summary::after{transform:rotate(90deg)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--ink2);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.mbars{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:6px}
+.mbars .m{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;cursor:default}
+.mbars .pair{display:flex;gap:2px;align-items:flex-end;height:100%;width:100%;justify-content:center}
+.mbars .pair i{width:42%;max-width:14px;border-radius:4px 4px 0 0;min-height:2px}
+.mbars small{font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   ARMUT · Aile bütçesi (gelir / gider)
+   Veri: tarayıcıda + (isteğe bağlı) GitHub deposunda ŞİFRELİ dosya
+   ========================================================= */
+const VER = '1.0.0';
+const LS_DB = 'armut_db', LS_CFG = 'armut_cfg';
+const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const AYK = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+const ODEME = ['Kredi Kartı','Banka','Nakit','Avans Hesap'];
+
+const VARSAYILAN_KAT = [
+  ['online-market','Online Market','🛒','gider'],['market','Bakkal / Market','🥖','gider'],
+  ['online-yemek','Online Yemek','🛵','gider'],['kafe','Kafe / Restoran','☕','gider'],
+  ['fatura','Faturalar & İletişim','💡','gider'],['konut','Konut / Site','🏠','gider'],
+  ['kredi','Kredi & Borç','🏦','gider'],['egitim','Eğitim','📚','gider'],
+  ['saglik','Bakım / Sağlık','💊','gider'],['ev','Ev / Dekorasyon','🛋️','gider'],
+  ['giyim','Giyim','👕','gider'],['ulasim','Ulaşım','🚗','gider'],
+  ['harclik','Harçlık / Para Transferi','👛','gider'],['sans','Şans Oyunu','🎲','gider'],
+  ['alkol','Alkol / Butik','🍷','gider'],['diger','Diğer','📦','gider'],
+  ['maas','Maaş','💼','gelir'],['ek-gelir','Ek Gelir','✨','gelir'],
+  ['tahsilat','Alacak Tahsilatı','🤝','gelir'],['gelir-diger','Diğer Gelir','➕','gelir']
+];
+const VARSAYILAN_SABIT = [
+  ['Site Aidatı','konut',500],['Elektrik','fatura',0],['Su','fatura',0],['Doğalgaz','fatura',0],['İnternet','fatura',0],
+  ['Cem Cep','fatura',267],['İlknur Cep','fatura',235],['Umut Cem Cep','fatura',0],['Arya Cep','fatura',0],['Mehri Cep','fatura',0],
+  ['Spotify','fatura',165],['Denizbank Kredi','kredi',12826.79],['Arya Deneme Kulübü','egitim',5000]
+];
+const VARSAYILAN_KURAL = [
+  ['MIGROS','online-market'],['GETIR','online-market'],['CARREFOUR','online-market'],['A101 EKSTRA','online-market'],['HEPSIEXPRESS','online-market'],
+  ['A101','market'],['SOK','market'],['BIM ','market'],['MARKET','market'],['TEKEL','market'],['TEKEL BUFE','sans'],
+  ['YEMEKPAY','online-yemek'],['YEMEKSEPETI','online-yemek'],['TRENDYOL YEMEK','online-yemek'],
+  ['PASTA','kafe'],['UNLU MAMUL','kafe'],['KAHVE','kafe'],['BURGER','kafe'],['PIZZA','kafe'],['BOREK','kafe'],['KAFE','kafe'],['KOFTECI','kafe'],['WAFFLE','kafe'],['KURUYEMIS','kafe'],['RESTORAN','kafe'],
+  ['TREDAS','fatura'],['TEKRDS','fatura'],['TURKST','fatura'],['VODAFONE','fatura'],['TURKCELL','fatura'],['SPOTIFY','fatura'],['TRBLDG','fatura'],
+  ['SITE YON','konut'],['KENTKUR','konut'],
+  ['KREDILI HESAP FAIZ','kredi'],['KESINTI VE EKLERI','diger'],
+  ['KIRTASIYE','egitim'],['KITABEVI','egitim'],['KITAPEVI','egitim'],['DR.COM','egitim'],['BKMKITAP','egitim'],['DENEME UCRETI','egitim'],
+  ['GRATIS','saglik'],['ECZANE','saglik'],['WATSONS','saglik'],['ROSSMANN','saglik'],
+  ['TEKNOSA','ev'],['MEDIA SATURN','ev'],['NALBUR','ev'],['HEPSIBURADA','ev'],['HEPSIPAY','ev'],['TRENDYOL.COM','ev'],['ARZUM','ev'],['IKEA','ev'],['KOCTAS','ev'],
+  ['BELBIM','ulasim'],['TOPLU TASIMA','ulasim'],['PETROL','ulasim'],['OPET','ulasim'],['SHELL','ulasim'],['OTOPARK','ulasim'],['GARENTA','ulasim'],['OBILET','ulasim'],['/ASIS','ulasim'],
+  ['BILYONER','sans'],['MISLI','sans'],['NESINE','sans'],
+  ['BUTIKBIRA','alkol'],['FAST-CEP','harclik']
+];
+
+/* ---------- yardımcılar ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now = () => Date.now();
+const uid = () => now().toString(36) + Math.random().toString(36).slice(2, 7);
+const nf = new Intl.NumberFormat('tr-TR', {minimumFractionDigits:0, maximumFractionDigits:2});
+const nf2 = new Intl.NumberFormat('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const TL = v => nf.format(Math.round((v||0)*100)/100) + ' ₺';
+const TLk = v => { const a = Math.abs(v); return a >= 100000 ? nf.format(Math.round(v/1000)) + ' B₺' : TL(v); };
+const pad = n => String(n).padStart(2, '0');
+const iso = d => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+const today = () => iso(new Date());
+const trUp = s => String(s||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/Ş/g,'S').replace(/Ğ/g,'G').replace(/Ü/g,'U').replace(/Ö/g,'O').replace(/Ç/g,'C');
+const fmtDate = s => { const [y,m,d] = s.split('-'); return +d + ' ' + AYK[+m-1] + ' ' + y; };
+const parseAmt = s => {
+  s = String(s ?? '').replace(/[₺\s]|TL/gi, '');
+  if (!s) return NaN;
+  const c = s.lastIndexOf(','), p = s.lastIndexOf('.');
+  if (c > -1 && p > -1) s = c > p ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+  else if (c > -1) s = s.replace(',', '.');
+  else if ((s.match(/\./g)||[]).length > 1) s = s.replace(/\./g,'');
+  return parseFloat(s);
+};
+function toast(msg, ms=2400){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+
+/* ---------- veri ---------- */
+function bosDB(){
+  const t = now();
+  return {
+    v:1,
+    ayar:{donemGun:1, butce:0, kisiler:['Ortak','İlknur','Cem','Umut Cem','Arya'], u:t},
+    kategoriler: VARSAYILAN_KAT.map(([id,ad,ikon,tur]) => ({id,ad,ikon,tur,u:t})),
+    sabitler: VARSAYILAN_SABIT.map(([ad,kat,tutar]) => ({id:uid(),ad,kat,tutar,u:t})),
+    kurallar: VARSAYILAN_KURAL.map(([k,kat]) => ({id:uid(),k,kat,u:t})),
+    islemler: [], durum: []
+  };
+}
+let db = (() => { try { return JSON.parse(localStorage.getItem(LS_DB)) || null; } catch(e){ return null; } })();
+let cfg = (() => { try { return JSON.parse(localStorage.getItem(LS_CFG)) || {}; } catch(e){ return {}; } })();
+const saveLocal = () => localStorage.setItem(LS_DB, JSON.stringify(db));
+const saveCfg = () => localStorage.setItem(LS_CFG, JSON.stringify(cfg));
+const live = arr => (arr||[]).filter(x => !x.del);
+const isAdmin = () => cfg.rol === 'admin';
+const kat = id => db.kategoriler.find(k => k.id === id) || {id, ad: id || 'Diğer', ikon:'📦', tur:'gider'};
+
+function degisti(){ db.v = 1; saveLocal(); render(); if (isAdmin() && syncAktif()) planlaGonder(); }
+function upsert(list, obj){ obj.u = now(); const i = db[list].findIndex(x => x.id === obj.id); if (i > -1) db[list][i] = obj; else db[list].push(obj); }
+function sil(list, id){ const x = db[list].find(x => x.id === id); if (x){ x.del = true; x.u = now(); } }
+
+function birlestir(a, b){
+  if (!a) return b; if (!b) return a;
+  const out = {v:1, ayar: (b.ayar?.u||0) > (a.ayar?.u||0) ? b.ayar : a.ayar};
+  for (const k of ['kategoriler','sabitler','kurallar','islemler','durum']){
+    const m = new Map();
+    for (const x of (a[k]||[])) m.set(x.id, x);
+    for (const x of (b[k]||[])){ const y = m.get(x.id); if (!y || (x.u||0) > (y.u||0)) m.set(x.id, x); }
+    out[k] = [...m.values()];
+  }
+  return out;
+}
+
+/* ---------- dönem ---------- */
+let secili = null; // {y, m}  (m: 0-11)
+function donemOf(dateStr){
+  const d = new Date(dateStr + 'T12:00:00'), g = db.ayar.donemGun || 1;
+  let y = d.getFullYear(), m = d.getMonth();
+  if (d.getDate() < g){ m--; if (m < 0){ m = 11; y--; } }
+  return {y, m};
+}
+function donemAralik(p){
+  const g = db.ayar.donemGun || 1;
+  const s = new Date(p.y, p.m, g), e = new Date(p.y, p.m+1, g); e.setDate(e.getDate()-1);
+  return [iso(s), iso(e)];
+}
+function donemAd(p){
+  if ((db.ayar.donemGun||1) === 1) return AYLAR[p.m] + ' ' + p.y;
+  const [s,e] = donemAralik(p);
+  const f = x => { const [y,m,d] = x.split('-'); return +d + ' ' + AYK[+m-1]; };
+  return f(s) + ' – ' + f(e) + ' ' + e.slice(0,4);
+}
+const kaydir = (p, n) => { const d = new Date(p.y, p.m + n, 1); return {y:d.getFullYear(), m:d.getMonth()}; };
+function islemlerArasi(s, e){ return live(db.islemler).filter(x => x.t >= s && x.t <= e); }
+function ozet(list){
+  let gelir = 0, gider = 0;
+  for (const x of list){ if (x.tur === 'gelir') gelir += +x.tutar; else gider += +x.tutar; }
+  return {gelir, gider, net: gelir - gider};
+}
+function katDagilim(list, tur='gider'){
+  const m = {};
+  for (const x of list) if (x.tur === tur) m[x.kat] = (m[x.kat]||0) + +x.tutar;
+  return Object.entries(m).filter(([,v]) => Math.abs(v) > 0.004).sort((a,b) => b[1]-a[1]);
+}
+
+/* ---------- şifreleme (AES-GCM + PBKDF2) ---------- */
+const b64 = buf => { let s=''; const u=new Uint8Array(buf); for (let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const keyCache = {};
+async function anahtar(sifre, salt){
+  const ck = sifre + '|' + b64(salt); if (keyCache[ck]) return keyCache[ck];
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(sifre), 'PBKDF2', false, ['deriveKey']);
+  return keyCache[ck] = await crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:250000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function gzip(bytes){
+  if (!window.CompressionStream) return null;
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+}
+async function gunzip(bytes){ return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()); }
+async function sifrele(obj, sifre){
+  let data = new TextEncoder().encode(JSON.stringify(obj)), z = 0;
+  const g = await gzip(data); if (g){ data = g; z = 1; }
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, await anahtar(sifre, salt), data);
+  return {armut:1, z, s:b64(salt), i:b64(iv), d:b64(ct), t:now()};
+}
+async function coz(pkg, sifre){
+  const salt = unb64(pkg.s);
+  let data = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(pkg.i)}, await anahtar(sifre, salt), unb64(pkg.d)));
+  if (pkg.z) data = await gunzip(data);
+  return JSON.parse(new TextDecoder().decode(data));
+}
+
+/* ---------- GitHub senkron ---------- */
+const DOSYA = 'data/armut.enc.json';
+function varsayilanRepo(){
+  const h = location.hostname;
+  if (h.endsWith('.github.io')) return {owner: h.split('.')[0], repo: location.pathname.split('/').filter(Boolean)[0] || h};
+  return {owner:'', repo:'armut'};
+}
+const syncAktif = () => !!(cfg.owner && cfg.repo && cfg.sifre);
+let sha = null, durumSync = 'off', gonderZ = null, mesgul = false;
+function syncDurum(s){ durumSync = s; const el = $('#syncLbl'), d = $('#syncDot'); if (!el) return;
+  const t = {off:'Yalnız bu cihaz', ok:'Güncel', wait:'Eşitleniyor…', err:'Eşitleme hatası', ro:'İzleyici · güncel'};
+  el.textContent = t[s] || s; d.className = 'dot ' + ({ok:'ok',ro:'ok',wait:'wait',err:'err'}[s]||''); }
+function ghHeaders(){ const h = {'Accept':'application/vnd.github+json'}; if (cfg.token) h.Authorization = 'Bearer ' + cfg.token; return h; }
+const apiUrl = () => `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${DOSYA}`;
+async function uzaktanOku(){
+  const r = await fetch(apiUrl() + '?t=' + now(), {headers: ghHeaders(), cache:'no-store'});
+  if (r.status === 404) return {yok:true};
+  if (!r.ok) throw new Error('GitHub okuma hatası (' + r.status + ')');
+  const j = await r.json(); sha = j.sha;
+  let txt;
+  if (j.content && j.encoding === 'base64') txt = new TextDecoder().decode(unb64(j.content.replace(/\n/g,'')));
+  else { const r2 = await fetch(j.download_url + '?t=' + now(), {cache:'no-store'}); txt = await r2.text(); }
+  const pkg = JSON.parse(txt);
+  try { return {db: await coz(pkg, cfg.sifre)}; }
+  catch(e){ throw new Error('Aile şifresi yanlış — dosya açılamadı.'); }
+}
+async function uzagaYaz(){
+  const pkg = await sifrele(db, cfg.sifre);
+  const body = {message: 'Armut veri güncelleme ' + new Date().toLocaleString('tr-TR'), content: btoa(JSON.stringify(pkg))};
+  if (sha) body.sha = sha;
+  const r = await fetch(apiUrl(), {method:'PUT', headers: {...ghHeaders(), 'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (r.status === 409 || r.status === 422) return 'cakisma';
+  if (r.status === 401 || r.status === 403) throw new Error('GitHub anahtarı (token) geçersiz ya da yetkisi yok.');
+  if (!r.ok) throw new Error('GitHub yazma hatası (' + r.status + ')');
+  sha = (await r.json()).content.sha; return 'ok';
+}
+async function esitle(sessiz){
+  if (!syncAktif() || mesgul) return; mesgul = true; syncDurum('wait');
+  try {
+    const u = await uzaktanOku();
+    if (u.db){ db = isAdmin() ? birlestir(db, u.db) : u.db; saveLocal(); }
+    if (isAdmin()){
+      let r = await uzagaYaz();
+      if (r === 'cakisma'){ const u2 = await uzaktanOku(); if (u2.db) db = birlestir(db, u2.db); saveLocal(); r = await uzagaYaz(); }
+      if (r !== 'ok') throw new Error('Eşitlenemedi, birazdan tekrar denenecek.');
+    } else if (u.yok) throw new Error('Henüz paylaşılmış veri yok. Yönetici ilk kaydı yapınca görünecek.');
+    syncDurum(isAdmin() ? 'ok' : 'ro'); cfg.sonSync = now(); saveCfg();
+    render();
+  } catch(e){ syncDurum('err'); if (!sessiz) toast(e.message, 4000); console.warn(e); }
+  finally { mesgul = false; }
+}
+function planlaGonder(){ syncDurum('wait'); clearTimeout(gonderZ); gonderZ = setTimeout(() => esitle(true), 1500); }
+
+/* ---------- arayüz durumu ---------- */
+let sekme = 'ana', filtre = {q:'', kat:'', tur:''}, raporMod = 'donem';
+
+function render(){
+  const root = $('#root');
+  if (!db || !cfg.rol){ root.innerHTML = karsilama(); return; }
+  if (!secili) secili = donemOf(today());
+  root.innerHTML = `
+  <div class="app">
+    <header>
+      <img class="logo" src="icons/icon-192.png" alt="">
+      <h1>Armut</h1><div class="sp"></div>
+      <div class="sync" onclick="esitle()"><span class="dot" id="syncDot"></span><span id="syncLbl"></span></div>
+    </header>
+    ${['ana','islem','rapor'].includes(sekme) ? `<div class="period">
+      <button class="ib" onclick="secili=kaydir(secili,${raporMod==='yil'&&sekme==='rapor'?-12:-1});render()">‹</button>
+      <b>${sekme==='rapor'&&raporMod==='yil' ? secili.y + ' yılı' : donemAd(secili)}</b>
+      <button class="ib" onclick="secili=kaydir(secili,${raporMod==='yil'&&sekme==='rapor'?12:1});render()">›</button></div>` : ''}
+    <main>${({ana:anaSayfa, islem:islemSayfa, rapor:raporSayfa, durum:durumSayfa, ayar:ayarSayfa})[sekme]()}</main>
+  </div>
+  ${isAdmin() && sekme !== 'ayar' ? '<button class="fab" onclick="islemFormu()" aria-label="Yeni kayıt">+</button>' : ''}
+  <nav><div class="in">
+    ${[['ana','🍐','Ana Sayfa'],['islem','🧾','Kayıtlar'],['rapor','📊','Rapor'],['durum','⚖️','Durum'],['ayar','⚙️','Ayarlar']]
+      .map(([k,e,t]) => `<button class="${sekme===k?'on':''}" onclick="sekme='${k}';render();scrollTo(0,0)"><span class="e">${e}</span>${t}</button>`).join('')}
+  </div></nav>`;
+  syncDurum(syncAktif() ? (durumSync === 'off' ? (isAdmin()?'ok':'ro') : durumSync) : 'off');
+}
+
+/* ---------- karşılama ---------- */
+function karsilama(){
+  const r = varsayilanRepo();
+  return `<div class="welcome">
+    <img src="icons/icon-512.png" alt="Armut">
+    <h1>Armut</h1>
+    <p>Aile içi gelir–gider defteri</p>
+    <div class="card">
+      <div class="seg" id="rolSeg">
+        <button class="on" data-r="admin" onclick="rolSec('admin')">Yönetici</button>
+        <button data-r="izleyici" onclick="rolSec('izleyici')">Aile üyesi (izleyici)</button>
+      </div>
+      <div id="rolAcik" class="small muted">Kayıt ekleyen, düzenleyen ve ayarları yöneten kişi.</div>
+      <label class="f">Aile şifresi</label>
+      <input class="i" id="wSifre" type="password" placeholder="Eşinle paylaşacağın ortak şifre" autocomplete="new-password">
+      <div id="wToken"><label class="f">GitHub anahtarı (token) — yalnız yönetici</label>
+      <input class="i" id="wTok" type="password" placeholder="github_pat_…  (sonra da girebilirsin)"></div>
+      <details class="ac" style="margin-top:8px"><summary class="small">Depo bilgisi</summary>
+        <div class="row2"><div><label class="f">GitHub kullanıcı</label><input class="i" id="wOwner" value="${esc(r.owner)}"></div>
+        <div><label class="f">Depo</label><input class="i" id="wRepo" value="${esc(r.repo)}"></div></div>
+      </details>
+      <div class="btns"><button class="btn" onclick="baslat()">Başla</button></div>
+      <p class="small muted" style="margin:12px 0 0">Şifreyi boş bırakırsan Armut yalnızca bu cihazda çalışır.</p>
+    </div>
+  </div>`;
+}
+let wRol = 'admin';
+function rolSec(r){ wRol = r; document.querySelectorAll('#rolSeg button').forEach(b => b.classList.toggle('on', b.dataset.r === r));
+  $('#wToken').style.display = r === 'admin' ? '' : 'none';
+  $('#rolAcik').textContent = r === 'admin' ? 'Kayıt ekleyen, düzenleyen ve ayarları yöneten kişi.' : 'Tüm ekranları görür, raporları indirir; kayıt değiştiremez.'; }
+async function baslat(){
+  cfg = {rol: wRol, sifre: $('#wSifre').value.trim(), token: wRol==='admin' ? $('#wTok').value.trim() : '', owner: $('#wOwner').value.trim(), repo: $('#wRepo').value.trim()};
+  if (wRol === 'izleyici' && !syncAktif()){ toast('İzleyici olarak girmek için aile şifresi ve depo bilgisi gerekli.'); return; }
+  saveCfg();
+  if (!db) db = bosDB();
+  saveLocal(); render();
+  if (syncAktif()) await esitle();
+}
+
+/* ---------- ANA SAYFA ---------- */
+function anaSayfa(){
+  const [s,e] = donemAralik(secili), list = islemlerArasi(s,e), o = ozet(list), dag = katDagilim(list);
+  const butce = +db.ayar.butce || 0, oran = butce ? o.gider / butce : 0;
+  const top = dag.slice(0,5), max = top.length ? top[0][1] : 1;
+  const son = [...list].sort((a,b) => b.t === a.t ? b.u - a.u : (b.t > a.t ? 1 : -1)).slice(0,6);
+  const sabitEksik = isAdmin() && live(db.sabitler).length && !list.some(x => x.sabit);
+  return `
+  <div class="card hero">
+    <div class="lbl">Bu dönem harcanan</div>
+    <div class="big">${TL(o.gider)}</div>
+    <div class="trio">
+      <div class="pill in"><small>Gelir</small><b>${TL(o.gelir)}</b></div>
+      <div class="pill ${o.net<0?'out':'in'}"><small>${o.net<0?'Açık':'Kalan'}</small><b>${TL(Math.abs(o.net))}</b></div>
+    </div>
+    ${butce ? `<div class="budget"><div class="track"><i class="${oran>1?'over':''}" style="width:${Math.min(100,oran*100).toFixed(1)}%"></i></div>
+      <div class="row"><span>Bütçe ${TL(butce)}</span><span>${oran>1 ? TL(o.gider-butce)+' aşıldı' : TL(butce-o.gider)+' kaldı'}</span></div></div>` : ''}
+  </div>
+  ${sabitEksik ? `<div class="card" style="display:flex;align-items:center;gap:12px"><div style="font-size:26px">📅</div>
+     <div style="flex:1"><b>Sabit giderler</b><div class="small muted">Bu dönemin aidat, fatura, kredi kayıtları henüz yok.</div></div>
+     <button class="btn sm" onclick="sabitFormu()">Ekle</button></div>` : ''}
+  <div class="card cats"><h3>En çok harcanan</h3>
+    ${top.length ? top.map(([k,v]) => { const c = kat(k); return `<div class="c" title="${esc(c.ad)}: ${TL(v)}"><div class="ic">${c.ikon}</div>
+      <div><div class="nm">${esc(c.ad)}<span>%${Math.round(v/o.gider*100)}</span></div><div class="bar"><i style="width:${Math.max(2,v/max*100)}%"></i></div></div>
+      <div class="v">${TL(v)}</div></div>`; }).join('') : '<div class="empty">Bu dönem henüz harcama yok.</div>'}
+  </div>
+  <div class="card"><h3>Son kayıtlar</h3>
+    ${son.length ? son.map(txSatir).join('') + `<div style="text-align:center;margin-top:8px"><button class="btn ghost sm" onclick="sekme='islem';render()">Tümünü gör</button></div>` : '<div class="empty">Kayıt yok. ' + (isAdmin() ? 'Sağ alttaki + ile ekleyebilirsin.' : '') + '</div>'}
+  </div>`;
+}
+function txSatir(x){
+  const c = kat(x.kat), out = x.tur !== 'gelir';
+  const alt = [fmtDate(x.t), x.kisi && x.kisi !== 'Ortak' ? x.kisi : '', x.odeme].filter(Boolean).join(' · ');
+  return `<div class="tx" onclick="islemFormu('${x.id}')"><div class="ic">${c.ikon}</div>
+    <div class="mid"><div class="t1">${esc(x.acik || c.ad)}</div><div class="t2">${esc(c.ad)} · ${esc(alt)}</div></div>
+    <div class="amt ${out?'out':'in'}">${out ? (x.tutar<0?'+':'−') : '+'}${TL(Math.abs(x.tutar))}</div></div>`;
+}
+
+/* ---------- KAYITLAR ---------- */
+function islemSayfa(){
+  const [s,e] = donemAralik(secili);
+  const q = trUp(filtre.q);
+  let list = islemlerArasi(s,e).filter(x => (!filtre.kat || x.kat === filtre.kat) && (!filtre.tur || x.tur === filtre.tur) && (!q || trUp(x.acik + ' ' + kat(x.kat).ad + ' ' + (x.kisi||'')).includes(q)));
+  list.sort((a,b) => b.t === a.t ? b.u - a.u : (b.t > a.t ? 1 : -1));
+  const o = ozet(list);
+  let html = '', gun = '';
+  for (const x of list){ if (x.t !== gun){ gun = x.t; html += `<div class="day">${fmtDate(gun)}</div>`; } html += txSatir(x); }
+  return `
+  <div class="card">
+    <input class="i" placeholder="Ara: market, Arya, elektrik…" value="${esc(filtre.q)}" oninput="filtre.q=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const i=document.querySelector('.card input.i');i.focus();i.setSelectionRange(99,99)},350)">
+    <div class="row2" style="margin-top:8px">
+      <select class="i" onchange="filtre.tur=this.value;render()"><option value="">Gelir + gider</option><option value="gider" ${filtre.tur==='gider'?'selected':''}>Yalnız gider</option><option value="gelir" ${filtre.tur==='gelir'?'selected':''}>Yalnız gelir</option></select>
+      <select class="i" onchange="filtre.kat=this.value;render()"><option value="">Tüm kategoriler</option>${live(db.kategoriler).map(k=>`<option value="${k.id}" ${filtre.kat===k.id?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('')}</select>
+    </div>
+    <div class="small muted" style="margin-top:8px">${list.length} kayıt · Gider ${TL(o.gider)} · Gelir ${TL(o.gelir)}</div>
+  </div>
+  <div class="card">${html || '<div class="empty">Bu filtrede kayıt yok.</div>'}</div>`;
+}
+
+/* ---------- RAPOR ---------- */
+function raporSayfa(){
+  const seg = `<div class="seg"><button class="${raporMod==='donem'?'on':''}" onclick="raporMod='donem';render()">Dönem</button><button class="${raporMod==='yil'?'on':''}" onclick="raporMod='yil';render()">Yıl</button></div>`;
+  return seg + (raporMod === 'donem' ? raporDonem() : raporYil()) + `
+  <div class="card"><h3>Dışa aktar</h3><div class="btns" style="margin-top:0">
+    <button class="btn" onclick="excelIndir()">📥 Excel raporu</button></div>
+    <p class="small muted" style="margin:8px 0 0">${raporMod==='yil'?secili.y+' yılının':'Seçili dönemin'} kayıtları + kategori×ay tablosu + sabit giderler + borç/varlık durumu.</p></div>`;
+}
+function raporDonem(){
+  const [s,e] = donemAralik(secili), list = islemlerArasi(s,e), o = ozet(list), dag = katDagilim(list), gel = katDagilim(list,'gelir');
+  const max = dag.length ? dag[0][1] : 1;
+  const bugun = today(), gunSay = Math.max(1, Math.round((new Date((bugun < e ? (bugun < s ? s : bugun) : e)+'T12:00') - new Date(s+'T12:00'))/864e5) + 1);
+  const mutfak = list.filter(x => x.tur==='gider' && ['online-market','market'].includes(x.kat)).reduce((a,x)=>a + +x.tutar, 0);
+  const kisi = {}; list.filter(x=>x.tur==='gider').forEach(x => kisi[x.kisi||'Ortak'] = (kisi[x.kisi||'Ortak']||0) + +x.tutar);
+  const odeme = {}; list.filter(x=>x.tur==='gider').forEach(x => odeme[x.odeme||'—'] = (odeme[x.odeme||'—']||0) + +x.tutar);
+  const onceki = (() => { const [a,b] = donemAralik(kaydir(secili,-1)); return ozet(islemlerArasi(a,b)).gider; })();
+  const fark = onceki ? (o.gider - onceki) / onceki * 100 : null;
+  return `
+  <div class="card"><div class="trio">
+    <div class="pill out"><small>Gider</small><b>${TL(o.gider)}</b></div>
+    <div class="pill in"><small>Gelir</small><b>${TL(o.gelir)}</b></div></div>
+    <div class="kv" style="margin-top:10px"><span class="muted">Net</span><b style="color:${o.net<0?'var(--gider)':'var(--gelir)'}">${TL(o.net)}</b></div>
+    ${fark!==null ? `<div class="kv"><span class="muted">Önceki döneme göre gider</span><b>${fark>0?'▲':'▼'} %${Math.abs(fark).toFixed(0)}</b></div>` : ''}
+    <div class="kv"><span class="muted">Günlük mutfak maliyeti (market)</span><b>${TL(mutfak/gunSay)}</b></div>
+    <div class="kv"><span class="muted">Günlük ortalama harcama</span><b>${TL(o.gider/gunSay)}</b></div>
+  </div>
+  <div class="card cats"><h3>Kategorilere göre gider</h3>
+    ${dag.length ? dag.map(([k,v]) => { const c = kat(k); return `<div class="c" title="${esc(c.ad)}: ${TL(v)}"><div class="ic">${c.ikon}</div>
+      <div><div class="nm">${esc(c.ad)}<span>%${(v/o.gider*100).toFixed(1)}</span></div><div class="bar"><i style="width:${Math.max(1,v/max*100)}%"></i></div></div><div class="v">${TL(v)}</div></div>`; }).join('') : '<div class="empty">Gider yok.</div>'}
+  </div>
+  ${gel.length ? `<div class="card"><h3>Gelirler</h3>${gel.map(([k,v]) => `<div class="kv"><span>${kat(k).ikon} ${esc(kat(k).ad)}</span><b>${TL(v)}</b></div>`).join('')}</div>` : ''}
+  <div class="card"><h3>Kimin için</h3>${Object.entries(kisi).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `<div class="kv"><span>${esc(k)}</span><b>${TL(v)}</b></div>`).join('') || '<div class="muted small">—</div>'}
+    <h3 style="margin-top:14px">Ödeme şekli</h3>${Object.entries(odeme).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `<div class="kv"><span>${esc(k)}</span><b>${TL(v)}</b></div>`).join('') || '<div class="muted small">—</div>'}
+  </div>`;
+}
+function yilVerisi(y){
+  const aylar = [];
+  for (let m=0;m<12;m++){ const p={y,m}, [s,e] = donemAralik(p), l = islemlerArasi(s,e); aylar.push({m, l, o: ozet(l)}); }
+  return aylar;
+}
+function raporYil(){
+  const y = secili.y, aylar = yilVerisi(y), tot = ozet(aylar.flatMap(a=>a.l));
+  const max = Math.max(1, ...aylar.map(a => Math.max(a.o.gider, a.o.gelir)));
+  const katlar = katDagilim(aylar.flatMap(a=>a.l));
+  return `
+  <div class="card"><div class="trio">
+    <div class="pill out"><small>${y} gider</small><b>${TLk(tot.gider)}</b></div>
+    <div class="pill in"><small>${y} gelir</small><b>${TLk(tot.gelir)}</b></div></div>
+    <div class="kv" style="margin-top:10px"><span class="muted">Aylık ortalama gider</span><b>${TL(tot.gider / Math.max(1, aylar.filter(a=>a.o.gider).length))}</b></div>
+  </div>
+  <div class="card"><h3>Aylara göre</h3>
+    <div class="legend"><span><i style="background:var(--gider)"></i>Gider</span><span><i style="background:var(--gelir)"></i>Gelir</span></div>
+    <div class="mbars">${aylar.map(a => `<div class="m" title="${AYLAR[a.m]} — Gider ${TL(a.o.gider)} · Gelir ${TL(a.o.gelir)}">
+      <div class="pair"><i style="height:${a.o.gider/max*100}%;background:var(--gider)"></i><i style="height:${a.o.gelir/max*100}%;background:var(--gelir)"></i></div><small>${AYK[a.m]}</small></div>`).join('')}</div>
+    <div class="scroll" style="margin-top:12px"><table class="t"><tr><th>Ay</th><th class="n">Gelir</th><th class="n">Gider</th><th class="n">Net</th></tr>
+      ${aylar.filter(a=>a.l.length).map(a => `<tr><td>${AYLAR[a.m]}</td><td class="n">${TL(a.o.gelir)}</td><td class="n">${TL(a.o.gider)}</td><td class="n" style="color:${a.o.net<0?'var(--gider)':'var(--gelir)'}">${TL(a.o.net)}</td></tr>`).join('')}
+      <tr class="tot"><td>Toplam</td><td class="n">${TL(tot.gelir)}</td><td class="n">${TL(tot.gider)}</td><td class="n">${TL(tot.net)}</td></tr></table></div>
+  </div>
+  <div class="card"><h3>Kategori × ay</h3><div class="scroll"><table class="t">
+    <tr><th>Kategori</th>${AYK.map(a=>`<th class="n">${a}</th>`).join('')}<th class="n">Toplam</th></tr>
+    ${katlar.map(([k,v]) => `<tr><td>${kat(k).ikon} ${esc(kat(k).ad)}</td>${aylar.map(a => { const t = a.l.filter(x=>x.tur==='gider'&&x.kat===k).reduce((s,x)=>s + +x.tutar,0); return `<td class="n">${t?nf.format(Math.round(t)):'<span class="muted">·</span>'}</td>`; }).join('')}<td class="n"><b>${nf.format(Math.round(v))}</b></td></tr>`).join('')}
+  </table></div></div>`;
+}
+
+/* ---------- DURUM (varlık / borç / alacak) ---------- */
+const DTIP = {varlik:['Varlıklar','💰','Banka hesapları, nakit, birikim'], borc:['Borçlar','🧾','Kredi, kredi kartı, avans hesap, taksitler'], alacak:['Alacaklar','🤝','Başkasında olan paramız']};
+function durumSayfa(){
+  const d = live(db.durum), top = t => d.filter(x=>x.tip===t).reduce((a,x)=>a + +x.tutar, 0);
+  const net = top('varlik') + top('alacak') - top('borc');
+  return `
+  <div class="card hero"><div class="lbl">Net durum (varlık + alacak − borç)</div>
+    <div class="net" style="color:${net<0?'var(--gider)':'var(--ink)'}">${TL(net)}</div></div>
+  ${Object.entries(DTIP).map(([t,[ad,ik,acik]]) => `
+  <div class="card"><h3>${ik} ${ad} <span style="float:right;color:var(--ink);text-transform:none;letter-spacing:0">${TL(top(t))}</span></h3>
+    ${d.filter(x=>x.tip===t).sort((a,b)=>b.tutar-a.tutar).map(x => `<div class="li" ${isAdmin()?`onclick="durumFormu('${x.id}')" style="cursor:pointer"`:''}>
+      <div class="grow"><div>${esc(x.ad)}</div>${x.not?`<div class="small muted">${esc(x.not)}</div>`:''}</div><b>${TL(x.tutar)}</b></div>`).join('') || `<div class="small muted">${acik}</div>`}
+    ${isAdmin() ? `<div style="margin-top:8px"><button class="btn ghost sm" onclick="durumFormu(null,'${t}')">+ Ekle</button></div>` : ''}
+  </div>`).join('')}
+  ${d.length ? `<p class="small muted" style="text-align:center">Son güncelleme: ${new Date(Math.max(...d.map(x=>x.u))).toLocaleDateString('tr-TR')}</p>` : ''}`;
+}
+function durumFormu(id, tip){
+  const x = id ? db.durum.find(d=>d.id===id) : {id:uid(), tip, ad:'', tutar:'', not:''};
+  sheet(`<h2>${DTIP[x.tip][1]} ${DTIP[x.tip][0]}</h2>
+    <label class="f">Ad</label><input class="i" id="dAd" value="${esc(x.ad)}" placeholder="ör. Garanti hesap, Denizbank kredi">
+    <label class="f">Tutar (₺)</label><input class="i" id="dTut" inputmode="decimal" value="${x.tutar!==''?nf2.format(x.tutar):''}">
+    <label class="f">Not</label><input class="i" id="dNot" value="${esc(x.not)}" placeholder="ör. 8 taksit kaldı, limit 350.000">
+    <div class="btns">${id?`<button class="btn red" onclick="sil('durum','${id}');kapat();degisti()">Sil</button>`:''}<button class="btn" id="dKay">Kaydet</button></div>`);
+  $('#dKay').onclick = () => { const t = parseAmt($('#dTut').value); if (!$('#dAd').value.trim() || isNaN(t)) return toast('Ad ve tutar gerekli');
+    upsert('durum', {...x, ad:$('#dAd').value.trim(), tutar:t, not:$('#dNot').value.trim()}); kapat(); degisti(); };
+}
+
+/* ---------- KAYIT FORMU ---------- */
+let fTur = 'gider', fKat = '', fKisi = 'Ortak', fOdeme = 'Kredi Kartı';
+function islemFormu(id){
+  const x = id ? db.islemler.find(i=>i.id===id) : null;
+  if (x && !isAdmin()){ // izleyici: yalnız göster
+    const c = kat(x.kat);
+    return sheet(`<h2>${c.ikon} ${esc(x.acik||c.ad)}</h2>
+      <div class="kv"><span class="muted">Tutar</span><b class="amt ${x.tur==='gelir'?'in':'out'}">${TL(x.tutar)}</b></div>
+      <div class="kv"><span class="muted">Tarih</span><b>${fmtDate(x.t)}</b></div><div class="kv"><span class="muted">Kategori</span><b>${esc(c.ad)}</b></div>
+      <div class="kv"><span class="muted">Kimin için</span><b>${esc(x.kisi||'Ortak')}</b></div><div class="kv"><span class="muted">Ödeme</span><b>${esc(x.odeme||'—')}</b></div>
+      ${x.not?`<p class="small">${esc(x.not)}</p>`:''}<div class="btns"><button class="btn ghost" onclick="kapat()">Kapat</button></div>`);
+  }
+  fTur = x?.tur || 'gider'; fKat = x?.kat || ''; fKisi = x?.kisi || 'Ortak'; fOdeme = x?.odeme || 'Kredi Kartı';
+  const ciz = () => {
+    const kats = live(db.kategoriler).filter(k => k.tur === fTur);
+    if (!kats.some(k=>k.id===fKat)) fKat = '';
+    $('#fBody').innerHTML = `
+      <div class="seg gg"><button class="out ${fTur==='gider'?'on':''}" data-t="gider">Gider</button><button class="in ${fTur==='gelir'?'on':''}" data-t="gelir">Gelir</button></div>
+      <input class="i amtin" id="fTut" inputmode="decimal" placeholder="0 ₺" value="${x?nf2.format(Math.abs(x.tutar)):($('#fTut')?.value||'')}">
+      ${x && x.tutar < 0 ? '<div class="small muted" style="text-align:center">Bu bir iade kaydı (gideri azaltır)</div>' : ''}
+      <label class="f">Kategori</label><div class="chips" id="fKats">${kats.map(k=>`<button class="chip ${fKat===k.id?'on':''}" data-k="${k.id}">${k.ikon} ${esc(k.ad)}</button>`).join('')}</div>
+      <label class="f">Açıklama</label><input class="i" id="fAc" list="acList" placeholder="ör. Migros, elektrik faturası" value="${esc(x?.acik || $('#fAc')?.value || '')}">
+      <div class="row2"><div><label class="f">Tarih</label><input class="i" type="date" id="fTar" value="${x?.t || $('#fTar')?.value || today()}"></div>
+      ${fTur==='gider' && !x ? `<div><label class="f">Taksit</label><select class="i" id="fTak">${[1,2,3,4,5,6,8,9,10,12].map(n=>`<option value="${n}">${n===1?'Peşin':n+' taksit'}</option>`).join('')}</select></div>` : '<div></div>'}</div>
+      <label class="f">Kimin için</label><div class="chips" id="fKisi">${db.ayar.kisiler.map(k=>`<button class="chip ${fKisi===k?'on':''}" data-v="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+      ${fTur==='gider' ? `<label class="f">Ödeme</label><div class="chips" id="fOd">${ODEME.map(k=>`<button class="chip ${fOdeme===k?'on':''}" data-v="${k}">${k}</button>`).join('')}</div>` : ''}
+      <label class="f">Not</label><input class="i" id="fNot" value="${esc(x?.not||'')}">
+      <div class="btns">${x?`<button class="btn red" id="fSil">Sil</button>`:''}<button class="btn" id="fKay">${x?'Güncelle':'Kaydet'}</button></div>`;
+    document.querySelectorAll('#fBody .seg button').forEach(b => b.onclick = () => { fTur = b.dataset.t; ciz(); });
+    document.querySelectorAll('#fKats .chip').forEach(b => b.onclick = () => { fKat = b.dataset.k; document.querySelectorAll('#fKats .chip').forEach(c=>c.classList.toggle('on', c===b)); });
+    document.querySelectorAll('#fKisi .chip').forEach(b => b.onclick = () => { fKisi = b.dataset.v; document.querySelectorAll('#fKisi .chip').forEach(c=>c.classList.toggle('on', c===b)); });
+    document.querySelectorAll('#fOd .chip').forEach(b => b.onclick = () => { fOdeme = b.dataset.v; document.querySelectorAll('#fOd .chip').forEach(c=>c.classList.toggle('on', c===b)); });
+    $('#fAc').oninput = e => { if (fKat) return; const k = kuralBul(e.target.value); if (k && kat(k).tur===fTur){ fKat = k; document.querySelectorAll('#fKats .chip').forEach(c=>c.classList.toggle('on', c.dataset.k===k)); } };
+    if (x) $('#fSil').onclick = () => { if (confirm('Bu kayıt silinsin mi?')){ sil('islemler', x.id); kapat(); degisti(); toast('Silindi'); } };
+    $('#fKay').onclick = () => {
+      let t = parseAmt($('#fTut').value);
+      if (!(t > 0)) return toast('Tutarı gir');
+      if (!fKat) return toast('Kategori seç');
+      if (x && x.tutar < 0) t = -t;
+      const base = {tur:fTur, kat:fKat, acik:$('#fAc').value.trim(), kisi:fKisi, odeme: fTur==='gider'?fOdeme:'', not:$('#fNot').value.trim()};
+      const tarih = $('#fTar').value || today();
+      if (x){ upsert('islemler', {...x, ...base, tutar:t, t:tarih}); }
+      else {
+        const n = +($('#fTak')?.value || 1);
+        if (n > 1){
+          const g = uid(), pay = Math.round(t / n * 100) / 100;
+          for (let i=0;i<n;i++){ const d = new Date(tarih+'T12:00'); d.setMonth(d.getMonth()+i);
+            upsert('islemler', {...base, id:uid(), grup:g, t:iso(d), tutar: i===n-1 ? Math.round((t - pay*(n-1))*100)/100 : pay, acik:(base.acik||kat(fKat).ad) + ` (${i+1}/${n})`}); }
+        } else upsert('islemler', {...base, id:uid(), t:tarih, tutar:t});
+      }
+      kapat(); degisti(); toast(x ? 'Güncellendi' : 'Kaydedildi 🍐');
+    };
+  };
+  sheet(`<h2>${x?'Kaydı düzenle':'Yeni kayıt'}</h2><div id="fBody"></div>
+    <datalist id="acList">${[...new Set(live(db.islemler).slice(-300).map(i=>i.acik).filter(Boolean).map(a=>a.replace(/ \(\d+\/\d+\)$/,'')))].slice(0,80).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>`);
+  ciz();
+  if (!x) setTimeout(() => $('#fTut')?.focus(), 250);
+}
+function kuralBul(metin){
+  const m = trUp(metin); if (!m) return '';
+  let best = null;
+  for (const r of live(db.kurallar)){ const k = trUp(r.k); if (k && m.includes(k) && (!best || k.length > trUp(best.k).length)) best = r; }
+  return best ? best.kat : '';
+}
+
+/* ---------- sabit giderler (toplu) ---------- */
+function sabitFormu(){
+  const [s,e] = donemAralik(secili), list = islemlerArasi(s,e);
+  const [ps,pe] = donemAralik(kaydir(secili,-1)), onceki = islemlerArasi(ps,pe);
+  const sab = live(db.sabitler);
+  sheet(`<h2>📅 Sabit giderler</h2><p class="small muted" style="margin:0 0 8px">${donemAd(secili)} · Geçen dönemin tutarları önerilir. Boş bırakılanlar eklenmez.</p>
+    <label class="f">Tarih</label><input class="i" type="date" id="sTar" value="${s <= today() && today() <= e ? today() : s}">
+    ${sab.map(x => { const var_ = list.find(i=>i.sabit===x.id), pr = onceki.find(i=>i.sabit===x.id);
+      const oneri = pr ? pr.tutar : (x.tutar || '');
+      return `<div class="li"><div class="grow"><div>${kat(x.kat).ikon} ${esc(x.ad)}</div><div class="small muted">${var_?'✔ bu dönem eklendi: '+TL(var_.tutar):(pr?'geçen dönem '+TL(pr.tutar):'')}</div></div>
+      <input class="i" style="width:120px;text-align:right" inputmode="decimal" data-s="${x.id}" ${var_?'disabled':''} value="${!var_ && oneri ? nf2.format(oneri) : ''}" placeholder="—"></div>`; }).join('')}
+    <div class="btns"><button class="btn ghost" onclick="kapat()">Vazgeç</button><button class="btn" id="sKay">Ekle</button></div>`);
+  $('#sKay').onclick = () => { let n = 0; const t = $('#sTar').value || s;
+    document.querySelectorAll('[data-s]').forEach(inp => { const v = parseAmt(inp.value); if (inp.disabled || !(v>0)) return;
+      const x = sab.find(z=>z.id===inp.dataset.s);
+      upsert('islemler', {id:uid(), tur:'gider', kat:x.kat, acik:x.ad, t, tutar:v, kisi:'Ortak', odeme:'Banka', sabit:x.id}); n++; });
+    kapat(); degisti(); toast(n + ' sabit gider eklendi'); };
+}
+
+/* ---------- AYARLAR ---------- */
+function ayarSayfa(){
+  const a = db.ayar, ad = isAdmin();
+  const dis = ad ? '' : 'disabled';
+  return `
+  <div class="card"><h3>Hesap</h3>
+    <div class="kv"><span>Rol</span><span class="badge">${ad ? 'Yönetici' : 'İzleyici'}</span></div>
+    <div class="kv"><span>Paylaşım</span><b class="small">${syncAktif() ? '🔒 '+esc(cfg.owner)+'/'+esc(cfg.repo) : 'Kapalı (yalnız bu cihaz)'}</b></div>
+    ${cfg.sonSync ? `<div class="kv"><span>Son eşitleme</span><span class="small">${new Date(cfg.sonSync).toLocaleString('tr-TR')}</span></div>` : ''}
+    <div class="btns"><button class="btn ghost" onclick="paylasimFormu()">Paylaşım ayarları</button>${syncAktif()?'<button class="btn" onclick="esitle()">Şimdi eşitle</button>':''}</div>
+  </div>
+  <div class="card"><h3>Genel</h3>
+    <label class="f">Aylık bütçe hedefi (₺, 0 = kapalı)</label><input class="i" ${dis} inputmode="decimal" value="${a.butce?nf2.format(a.butce):''}" onchange="db.ayar.butce=parseAmt(this.value)||0;db.ayar.u=now();degisti()">
+    <label class="f">Dönem başlangıç günü (kredi kartı kesim günü gibi)</label>
+    <select class="i" ${dis} onchange="db.ayar.donemGun=+this.value;db.ayar.u=now();secili=null;degisti()">${Array.from({length:28},(_,i)=>`<option ${a.donemGun===i+1?'selected':''} value="${i+1}">${i===0?'Ayın 1’i (takvim ayı)':'Her ayın '+(i+1)+'’i'}</option>`).join('')}</select>
+    <label class="f">Aile üyeleri (virgülle)</label><input class="i" ${dis} value="${esc(a.kisiler.join(', '))}" onchange="db.ayar.kisiler=this.value.split(',').map(s=>s.trim()).filter(Boolean);if(!db.ayar.kisiler.length)db.ayar.kisiler=['Ortak'];db.ayar.u=now();degisti()">
+  </div>
+  ${ad ? `
+  <div class="card"><h3>Listeler</h3>
+    <details class="ac"><summary>🏷️ Kategoriler (${live(db.kategoriler).length})</summary>${listeDuzen('kategoriler')}</details>
+    <details class="ac"><summary>📅 Sabit giderler (${live(db.sabitler).length})</summary>${listeDuzen('sabitler')}</details>
+    <details class="ac"><summary>🔎 Otomatik kategori kuralları (${live(db.kurallar).length})</summary>${listeDuzen('kurallar')}</details>
+  </div>
+  <div class="card"><h3>İçe aktar</h3>
+    <button class="btn ghost" onclick="ekstreFormu()">📋 Ekstreden yapıştır (Excel / banka)</button>
+    <div style="height:8px"></div>
+    <button class="btn ghost" onclick="dosyaSec()">📂 Yedek / ilk veri dosyası yükle (.json)</button>
+  </div>` : ''}
+  <div class="card"><h3>Yedek</h3>
+    <button class="btn ghost" onclick="yedekIndir()">💾 Yedek indir (.json)</button>
+    <p class="small muted" style="margin:8px 0 0">Yedek dosyası şifresizdir; güvenli bir yerde (ör. Drive) sakla.</p>
+  </div>
+  <div class="card"><button class="btn red" onclick="if(confirm('Bu cihazdaki Armut oturumu kapatılsın mı? (Paylaşılan veri silinmez)')){localStorage.removeItem('${LS_CFG}');${ad?'':`localStorage.removeItem('${LS_DB}');`}location.reload()}">Oturumu kapat</button>
+  <p class="small muted" style="text-align:center;margin:10px 0 0">Armut v${VER}</p></div>`;
+}
+function listeDuzen(tip){
+  const L = live(db[tip]);
+  const katOpt = (sel, tur) => live(db.kategoriler).filter(k=>!tur||k.tur===tur).map(k=>`<option value="${k.id}" ${sel===k.id?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('');
+  const u = (id, alan, ifade) => `onchange="(function(el){const x=db.${tip}.find(z=>z.id==='${id}');x.${alan}=${ifade};x.u=now();degisti()})(this)"`;
+  if (tip === 'kategoriler') return L.map(k => `<div class="li"><input class="i" style="width:52px;text-align:center" value="${k.ikon}" ${u(k.id,'ikon','el.value')}>
+      <input class="i grow" value="${esc(k.ad)}" ${u(k.id,'ad','el.value')}><span class="small muted">${k.tur}</span><button class="x" onclick="if(confirm('Kategori silinsin mi? Eski kayıtlar korunur.')){sil('kategoriler','${k.id}');degisti()}">✕</button></div>`).join('')
+    + `<div class="btns"><button class="btn ghost sm" onclick="yeniKat('gider')">+ Gider kategorisi</button><button class="btn ghost sm" onclick="yeniKat('gelir')">+ Gelir kategorisi</button></div>`;
+  if (tip === 'sabitler') return L.map(s => `<div class="li"><input class="i grow" value="${esc(s.ad)}" ${u(s.id,'ad','el.value')}>
+      <select class="i" style="width:130px" ${u(s.id,'kat','el.value')}>${katOpt(s.kat,'gider')}</select>
+      <input class="i" style="width:90px;text-align:right" inputmode="decimal" value="${s.tutar?nf2.format(s.tutar):''}" placeholder="tutar" ${u(s.id,'tutar','parseAmt(el.value)||0')}>
+      <button class="x" onclick="sil('sabitler','${s.id}');degisti()">✕</button></div>`).join('')
+    + `<div class="btns"><button class="btn ghost sm" onclick="upsert('sabitler',{id:uid(),ad:'Yeni sabit gider',kat:'fatura',tutar:0});degisti()">+ Sabit gider</button></div>`;
+  return `<p class="small muted">Açıklamada bu kelime geçerse kategori otomatik seçilir (ekstre aktarımında da).</p>` + L.map(r => `<div class="li"><input class="i grow" value="${esc(r.k)}" ${u(r.id,'k','el.value')}>
+      <select class="i" style="width:150px" ${u(r.id,'kat','el.value')}>${katOpt(r.kat)}</select><button class="x" onclick="sil('kurallar','${r.id}');degisti()">✕</button></div>`).join('')
+    + `<div class="btns"><button class="btn ghost sm" onclick="upsert('kurallar',{id:uid(),k:'',kat:'diger'});degisti()">+ Kural</button></div>`;
+}
+function yeniKat(tur){ const ad = prompt('Kategori adı:'); if (!ad) return; const ikon = prompt('Simge (emoji):', tur==='gider'?'🏷️':'💵') || '🏷️';
+  upsert('kategoriler', {id: 'k' + uid(), ad, ikon, tur}); degisti(); }
+function paylasimFormu(){
+  sheet(`<h2>🔒 Paylaşım</h2>
+    <p class="small muted" style="margin-top:0">Veriler GitHub deponda <b>aile şifresiyle şifreli</b> bir dosyada tutulur. Şifreyi bilmeyen hiçbir şey okuyamaz.</p>
+    <div class="row2"><div><label class="f">GitHub kullanıcı</label><input class="i" id="pO" value="${esc(cfg.owner||varsayilanRepo().owner)}"></div>
+    <div><label class="f">Depo</label><input class="i" id="pR" value="${esc(cfg.repo||varsayilanRepo().repo)}"></div></div>
+    <label class="f">Aile şifresi</label><input class="i" id="pS" type="password" value="${esc(cfg.sifre||'')}" autocomplete="new-password">
+    ${isAdmin() ? `<label class="f">GitHub anahtarı (fine-grained token, yalnız armut deposu · Contents: Read and write)</label><input class="i" id="pT" type="password" value="${esc(cfg.token||'')}">` : ''}
+    <p class="small muted">Eşinin telefonunda: uygulamayı aç → <b>Aile üyesi (izleyici)</b> → aynı aile şifresi.</p>
+    <div class="btns"><button class="btn ghost" onclick="kapat()">Vazgeç</button><button class="btn" id="pK">Kaydet ve eşitle</button></div>`);
+  $('#pK').onclick = async () => { cfg.owner = $('#pO').value.trim(); cfg.repo = $('#pR').value.trim(); cfg.sifre = $('#pS').value.trim(); if (isAdmin()) cfg.token = $('#pT').value.trim();
+    sha = null; saveCfg(); kapat(); render(); if (syncAktif()) await esitle(); };
+}
+
+/* ---------- ekstreden yapıştır ---------- */
+let ekstre = [];
+function ekstreFormu(){
+  sheet(`<h2>📋 Ekstreden yapıştır</h2>
+    <p class="small muted" style="margin-top:0">Excel'den <b>Tarih · Açıklama · Tutar</b> sütunlarını seçip kopyala, buraya yapıştır. Eksi (−) tutarlar gider, “İADE” içeren artılar iade, diğer artılar gelir sayılır.</p>
+    <textarea class="i" id="eT" rows="7" placeholder="27/10/2026	DERİN TEKEL BÜFE	-2495"></textarea>
+    <div class="btns"><button class="btn" id="eOk">Önizle</button></div><div id="eOn"></div>`);
+  $('#eOk').onclick = () => {
+    ekstre = [];
+    const var_ = new Set(live(db.islemler).map(x => x.t + '|' + Math.abs(x.tutar).toFixed(2) + '|' + trUp(x.acik).slice(0,20)));
+    for (const satir of $('#eT').value.split(/\r?\n/)){
+      if (!satir.trim()) continue;
+      let p = satir.split('\t').map(s=>s.trim()).filter(s=>s!=='');
+      if (p.length < 3){ const m = satir.match(/^\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(.+?)\s+(-?[\d.,]+)\s*(TL|₺)?\s*$/i); if (m) p = [m[1], m[2], m[3]]; }
+      const dm = (p[0]||'').match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/); if (!dm) continue;
+      const y = dm[3].length===2 ? '20'+dm[3] : dm[3], t = `${y}-${pad(dm[2])}-${pad(dm[1])}`;
+      const tutar = parseAmt(p[p.length-1]); if (isNaN(tutar) || !tutar) continue;
+      const acik = p.slice(1, -1).join(' ').replace(/^SATIŞ-\d+\*\d+-/i,'').trim();
+      const iade = tutar > 0 && /İADE|IADE|İade|iade/.test(acik);
+      const tur = tutar < 0 || iade ? 'gider' : 'gelir';
+      const k = kuralBul(acik);
+      const kk = k && kat(k).tur === tur ? k : (tur==='gider'?'diger':'gelir-diger');
+      const key = t + '|' + Math.abs(tutar).toFixed(2) + '|' + trUp(acik).slice(0,20);
+      ekstre.push({sec: !var_.has(key), cift: var_.has(key), t, acik, tur, tutar: iade ? -Math.abs(tutar) : Math.abs(tutar), kat: kk, odeme: /\*\d{4}|SATIŞ/i.test(p.slice(1,-1).join(' ')) ? 'Kredi Kartı' : 'Banka'});
+    }
+    ekstreOnizle();
+  };
+}
+function ekstreOnizle(){
+  const opt = (tur, sel) => live(db.kategoriler).filter(k=>k.tur===tur).map(k=>`<option value="${k.id}" ${k.id===sel?'selected':''}>${k.ikon} ${esc(k.ad)}</option>`).join('');
+  $('#eOn').innerHTML = ekstre.length ? `<p class="small"><b>${ekstre.length}</b> satır bulundu · ${ekstre.filter(e=>e.cift).length} tanesi zaten kayıtlı görünüyor (işaretsiz).</p>
+    ${ekstre.map((e,i) => `<div class="li" style="align-items:flex-start"><input type="checkbox" ${e.sec?'checked':''} onchange="ekstre[${i}].sec=this.checked" style="margin-top:12px;width:20px;height:20px">
+      <div class="grow"><div class="small">${fmtDate(e.t)} · <b class="amt ${e.tur==='gelir'?'in':'out'}">${e.tutar<0?'iade ':''}${TL(Math.abs(e.tutar))}</b></div>
+      <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.acik)}</div>
+      <select class="i" style="padding:6px 8px;margin-top:4px" onchange="ekstre[${i}].kat=this.value">${opt(e.tur, e.kat)}</select></div></div>`).join('')}
+    <div class="btns"><button class="btn" onclick="ekstreKaydet()">Seçilenleri kaydet</button></div>` : '<p class="small muted">Satır okunamadı. Tarih gg/aa/yyyy biçiminde olmalı.</p>';
+}
+function ekstreKaydet(){ let n = 0;
+  for (const e of ekstre) if (e.sec){ upsert('islemler', {id:uid(), t:e.t, tur:e.tur, tutar:e.tutar, kat:e.kat, acik:e.acik, kisi:'Ortak', odeme:e.tur==='gider'?e.odeme:''}); n++; }
+  kapat(); degisti(); toast(n + ' kayıt eklendi 🍐'); }
+
+/* ---------- yedek / içe aktar ---------- */
+function indir(ad, blob){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ad; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000); }
+function yedekIndir(){ indir('armut-yedek-' + today() + '.json', new Blob([JSON.stringify(db, null, 1)], {type:'application/json'})); }
+function dosyaSec(){ const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
+  i.onchange = async () => { try { const j = JSON.parse(await i.files[0].text());
+      if (j.armutIlkVeri){ ilkVeriYukle(j); return; }
+      if (!j.islemler) throw 0;
+      if (!confirm('Yedekteki ' + live(j.islemler).length + ' kayıt mevcut verilerle birleştirilsin mi?')) return;
+      db = birlestir(db, j); degisti(); toast('Yedek yüklendi');
+    } catch(e){ toast('Dosya okunamadı'); } };
+  i.click(); }
+function ilkVeriYukle(j){
+  const varMi = live(db.islemler).some(x => x.kaynak === 'excel');
+  if (varMi && !confirm('Excel aktarımı daha önce yapılmış. Tekrar eklensin mi? (Çift kayıt olabilir)')) return;
+  if (!varMi && !confirm(`Excel dosyandan ${j.islemler.length} aylık toplam kaydı ve ${j.durum.length} varlık/borç/alacak satırı eklensin mi?`)) return;
+  for (const x of j.islemler){ const s = live(db.sabitler).find(z => trUp(z.ad) === trUp(x.acik));
+    upsert('islemler', {...x, id:uid(), kaynak:'excel', ...(s ? {sabit:s.id} : {})}); }
+  for (const d of j.durum) upsert('durum', {...d, id:uid()});
+  for (const s of (j.sabitler||[])){ const v = db.sabitler.find(z=>!z.del && trUp(z.ad)===trUp(s.ad)); if (v){ v.tutar = s.tutar; v.u = now(); } }
+  degisti(); toast('Excel verisi aktarıldı 🍐'); }
+
+/* ---------- Excel raporu ---------- */
+function xlsxYukle(){ return window.XLSX ? Promise.resolve() : new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload = ok; s.onerror = () => no(new Error('Excel kütüphanesi yüklenemedi (internet?)')); document.head.appendChild(s); }); }
+async function excelIndir(){
+  try { await xlsxYukle(); } catch(e){ return toast(e.message); }
+  const y = secili.y, yil = raporMod === 'yil';
+  const [s,e] = yil ? [donemAralik({y,m:0})[0], donemAralik({y,m:11})[1]] : donemAralik(secili);
+  const list = islemlerArasi(s,e).sort((a,b) => a.t > b.t ? 1 : -1);
+  const wb = XLSX.utils.book_new();
+  const kayit = [['Tarih','Tür','Kategori','Açıklama','Tutar (₺)','Kimin için','Ödeme','Not']].concat(list.map(x => [new Date(x.t+'T12:00'), x.tur==='gelir'?'Gelir':(x.tutar<0?'İade':'Gider'), kat(x.kat).ad, x.acik||'', +x.tutar, x.kisi||'', x.odeme||'', x.not||'']));
+  const ws1 = XLSX.utils.aoa_to_sheet(kayit, {cellDates:true}); ws1['!cols'] = [{wch:11},{wch:7},{wch:22},{wch:40},{wch:12},{wch:12},{wch:12},{wch:20}];
+  ws1['!autofilter'] = {ref: 'A1:H' + kayit.length};
+  for (let r=2;r<=kayit.length;r++){ const c = ws1['E'+r]; if (c) c.z = '#,##0.00'; const d = ws1['A'+r]; if (d) d.z = 'dd.mm.yyyy'; }
+  XLSX.utils.book_append_sheet(wb, ws1, 'Kayıtlar');
+  // kategori × ay (yıl)
+  const aylar = yilVerisi(y), gk = katDagilim(aylar.flatMap(a=>a.l));
+  const pv = [['Kategori', ...AYLAR, 'TOPLAM']];
+  for (const [k] of gk) pv.push([kat(k).ad, ...aylar.map(a => +a.l.filter(x=>x.tur==='gider'&&x.kat===k).reduce((s,x)=>s + +x.tutar,0).toFixed(2)), 0]);
+  pv.push(['GİDER TOPLAM', ...aylar.map(a => +a.o.gider.toFixed(2)), 0]);
+  pv.push(['GELİR TOPLAM', ...aylar.map(a => +a.o.gelir.toFixed(2)), 0]);
+  pv.push(['NET', ...aylar.map(a => +a.o.net.toFixed(2)), 0]);
+  const ws2 = XLSX.utils.aoa_to_sheet(pv);
+  for (let r=2;r<=pv.length;r++){ ws2['N'+r] = {t:'n', f:`SUM(B${r}:M${r})`, z:'#,##0.00'}; for (const c of 'BCDEFGHIJKLM') if (ws2[c+r]) ws2[c+r].z = '#,##0'; }
+  ws2['!cols'] = [{wch:24}, ...Array(13).fill({wch:11})];
+  XLSX.utils.book_append_sheet(wb, ws2, y + ' Kategori-Ay');
+  // sabit giderler (yıl)
+  const sab = live(db.sabitler), sv = [['Sabit gider', ...AYLAR, 'TOPLAM']];
+  for (const x of sab) sv.push([x.ad, ...aylar.map(a => +a.l.filter(i => i.sabit===x.id || (i.tur==='gider' && trUp(i.acik)===trUp(x.ad))).reduce((s,i)=>s + +i.tutar,0).toFixed(2))]);
+  const ws3 = XLSX.utils.aoa_to_sheet(sv); for (let r=2;r<=sv.length;r++) ws3['N'+r] = {t:'n', f:`SUM(B${r}:M${r})`, z:'#,##0.00'};
+  ws3['!cols'] = [{wch:22}, ...Array(13).fill({wch:10})];
+  XLSX.utils.book_append_sheet(wb, ws3, y + ' Sabit Giderler');
+  // durum
+  const d = live(db.durum), dv = [['Tür','Ad','Tutar (₺)','Not']];
+  for (const t of ['varlik','alacak','borc']) for (const x of d.filter(z=>z.tip===t)) dv.push([DTIP[t][0], x.ad, +x.tutar, x.not||'']);
+  dv.push([], ['NET DURUM','', d.reduce((a,x)=>a + (x.tip==='borc'?-1:1) * x.tutar, 0)]);
+  const ws4 = XLSX.utils.aoa_to_sheet(dv); ws4['!cols'] = [{wch:12},{wch:28},{wch:14},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Borç-Varlık');
+  XLSX.writeFile(wb, `Armut_${yil ? y : donemAd(secili).replace(/[^\wığüşöçİĞÜŞÖÇ]+/g,'_')}.xlsx`);
+}
+
+/* ---------- alt pencere ---------- */
+function sheet(html){ kapat(); const bg = document.createElement('div'); bg.className = 'sheet-bg'; bg.id = 'sheet';
+  bg.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`; bg.onclick = e => { if (e.target === bg) kapat(); }; document.body.appendChild(bg); }
+function kapat(){ $('#sheet')?.remove(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') kapat(); });
+
+/* ---------- başlat ---------- */
+render();
+if (cfg.rol && syncAktif()) esitle(true);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cfg.rol && syncAktif() && !$('#sheet')) esitle(true); });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
