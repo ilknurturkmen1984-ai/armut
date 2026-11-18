@@ -110,10 +110,6 @@ table.t tr.tot td{font-weight:700;border-bottom:0}
 .li .x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px}
 .net{font-size:30px;font-weight:750;letter-spacing:-.6px}
 .toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:40;box-shadow:var(--sh);animation:fd .2s;max-width:90vw;text-align:center}
-.welcome{min-height:100vh;display:flex;flex-direction:column;justify-content:center;max-width:420px;margin:0 auto;padding:24px}
-.welcome img{width:96px;height:96px;margin:0 auto 10px;display:block;border-radius:24px;box-shadow:var(--sh)}
-.welcome h1{text-align:center;margin:0}
-.welcome p{text-align:center;color:var(--ink2)}
 .kv{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
 .badge{font-size:11px;background:var(--pear-l);color:var(--pear-d);padding:2px 8px;border-radius:99px;font-weight:600}
 details.ac{border-top:1px solid var(--line);padding:10px 0}
@@ -270,67 +266,43 @@ function katDagilim(list, tur='gider'){
   return Object.entries(m).filter(([,v]) => Math.abs(v) > 0.004).sort((a,b) => b[1]-a[1]);
 }
 
-/* ---------- şifreleme (AES-GCM + PBKDF2) ---------- */
+/* ---------- GitHub senkron (açık JSON, YKS-LGS gibi) ---------- */
 const b64 = buf => { let s=''; const u=new Uint8Array(buf); for (let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); };
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-const keyCache = {};
-async function anahtar(sifre, salt){
-  const ck = sifre + '|' + b64(salt); if (keyCache[ck]) return keyCache[ck];
-  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(sifre), 'PBKDF2', false, ['deriveKey']);
-  return keyCache[ck] = await crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:250000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
-}
-async function gzip(bytes){
-  if (!window.CompressionStream) return null;
-  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
-}
-async function gunzip(bytes){ return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()); }
-async function sifrele(obj, sifre){
-  let data = new TextEncoder().encode(JSON.stringify(obj)), z = 0;
-  const g = await gzip(data); if (g){ data = g; z = 1; }
-  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, await anahtar(sifre, salt), data);
-  return {armut:1, z, s:b64(salt), i:b64(iv), d:b64(ct), t:now()};
-}
-async function coz(pkg, sifre){
-  const salt = unb64(pkg.s);
-  let data = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(pkg.i)}, await anahtar(sifre, salt), unb64(pkg.d)));
-  if (pkg.z) data = await gunzip(data);
-  return JSON.parse(new TextDecoder().decode(data));
-}
-
-/* ---------- GitHub senkron ---------- */
-const DOSYA = 'data/armut.enc.json';
+const DOSYA = 'data/armut.json';
 function varsayilanRepo(){
   const h = location.hostname;
   if (h.endsWith('.github.io')) return {owner: h.split('.')[0], repo: location.pathname.split('/').filter(Boolean)[0] || h};
   return {owner:'', repo:'armut'};
 }
-const syncAktif = () => !!(cfg.owner && cfg.repo && cfg.sifre);
+const syncAktif = () => !!(cfg.owner && cfg.repo);
 let sha = null, durumSync = 'off', gonderZ = null, mesgul = false;
 function syncDurum(s){ durumSync = s; const el = $('#syncLbl'), d = $('#syncDot'); if (!el) return;
-  const t = {off:'Yalnız bu cihaz', ok:'Güncel', wait:'Eşitleniyor…', err:'Eşitleme hatası', ro:'İzleyici · güncel'};
+  const t = {off:'Yalnız bu cihaz', ok:'Güncel', wait:'Eşitleniyor…', err:'Eşitleme hatası', ro:'Güncel'};
   el.textContent = t[s] || s; d.className = 'dot ' + ({ok:'ok',ro:'ok',wait:'wait',err:'err'}[s]||''); }
 function ghHeaders(){ const h = {'Accept':'application/vnd.github+json'}; if (cfg.token) h.Authorization = 'Bearer ' + cfg.token; return h; }
 const apiUrl = () => `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${DOSYA}`;
 async function uzaktanOku(){
-  const r = await fetch(apiUrl() + '?t=' + now(), {headers: ghHeaders(), cache:'no-store'});
-  if (r.status === 404) return {yok:true};
-  if (!r.ok) throw new Error('GitHub okuma hatası (' + r.status + ')');
+  let r;
+  try { r = await fetch(apiUrl() + '?t=' + now(), {headers: ghHeaders(), cache:'no-store'}); } catch(e){ r = null; }
+  if (r && r.status === 404) return {yok:true};
+  if (!r || !r.ok){
+    if (isAdmin()) throw new Error('GitHub okuma hatası' + (r ? ' (' + r.status + ')' : ''));
+    const r2 = await fetch(DOSYA + '?t=' + now(), {cache:'no-store'}); // izleyici: Pages kopyası
+    if (r2.status === 404) return {yok:true};
+    if (!r2.ok) throw new Error('Veri okunamadı (' + r2.status + ')');
+    return {db: await r2.json()};
+  }
   const j = await r.json(); sha = j.sha;
-  let txt;
-  if (j.content && j.encoding === 'base64') txt = new TextDecoder().decode(unb64(j.content.replace(/\n/g,'')));
-  else { const r2 = await fetch(j.download_url + '?t=' + now(), {cache:'no-store'}); txt = await r2.text(); }
-  const pkg = JSON.parse(txt);
-  try { return {db: await coz(pkg, cfg.sifre)}; }
-  catch(e){ throw new Error('Aile şifresi yanlış — dosya açılamadı.'); }
+  if (j.content && j.encoding === 'base64') return {db: JSON.parse(new TextDecoder().decode(unb64(j.content.replace(/\n/g,''))))};
+  const r3 = await fetch(j.download_url + '?t=' + now(), {cache:'no-store'}); return {db: await r3.json()};
 }
 async function uzagaYaz(){
-  const pkg = await sifrele(db, cfg.sifre);
-  const body = {message: 'Armut veri güncelleme ' + new Date().toLocaleString('tr-TR'), content: btoa(JSON.stringify(pkg))};
+  const body = {message: 'Armut veri güncelleme ' + new Date().toLocaleString('tr-TR'), content: b64(new TextEncoder().encode(JSON.stringify(db)))};
   if (sha) body.sha = sha;
   const r = await fetch(apiUrl(), {method:'PUT', headers: {...ghHeaders(), 'Content-Type':'application/json'}, body: JSON.stringify(body)});
   if (r.status === 409 || r.status === 422) return 'cakisma';
-  if (r.status === 401 || r.status === 403) throw new Error('GitHub anahtarı (token) geçersiz ya da yetkisi yok.');
+  if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error('GitHub anahtarı (token) geçersiz, süresi dolmuş ya da yetkisi yok. Ayarlar → Yönetici girişi.');
   if (!r.ok) throw new Error('GitHub yazma hatası (' + r.status + ')');
   sha = (await r.json()).content.sha; return 'ok';
 }
@@ -343,7 +315,7 @@ async function esitle(sessiz){
       let r = await uzagaYaz();
       if (r === 'cakisma'){ const u2 = await uzaktanOku(); if (u2.db) db = birlestir(db, u2.db); saveLocal(); r = await uzagaYaz(); }
       if (r !== 'ok') throw new Error('Eşitlenemedi, birazdan tekrar denenecek.');
-    } else if (u.yok) throw new Error('Henüz paylaşılmış veri yok. Yönetici ilk kaydı yapınca görünecek.');
+    } else if (u.yok) throw new Error('Henüz paylaşılmış veri yok.');
     syncDurum(isAdmin() ? 'ok' : 'ro'); cfg.sonSync = now(); saveCfg();
     render();
   } catch(e){ syncDurum('err'); if (!sessiz) toast(e.message, 4000); console.warn(e); }
@@ -356,7 +328,8 @@ let sekme = 'ana', filtre = {q:'', kat:'', tur:''}, raporMod = 'donem';
 
 function render(){
   const root = $('#root');
-  if (!db || !cfg.rol){ root.innerHTML = karsilama(); return; }
+  if (!cfg.rol){ cfg = {rol:'izleyici', ...varsayilanRepo()}; saveCfg(); }
+  if (!db){ db = bosDB(); saveLocal(); }
   if (!secili) secili = donemOf(today());
   root.innerHTML = `
   <div class="app">
@@ -379,43 +352,19 @@ function render(){
   syncDurum(syncAktif() ? (durumSync === 'off' ? (isAdmin()?'ok':'ro') : durumSync) : 'off');
 }
 
-/* ---------- karşılama ---------- */
-function karsilama(){
+/* ---------- yönetici girişi ---------- */
+function yoneticiFormu(){
   const r = varsayilanRepo();
-  return `<div class="welcome">
-    <img src="icons/icon-512.png" alt="Armut">
-    <h1>Armut</h1>
-    <p>Aile içi gelir–gider defteri</p>
-    <div class="card">
-      <div class="seg" id="rolSeg">
-        <button class="on" data-r="admin" onclick="rolSec('admin')">Yönetici</button>
-        <button data-r="izleyici" onclick="rolSec('izleyici')">Aile üyesi (izleyici)</button>
-      </div>
-      <div id="rolAcik" class="small muted">Kayıt ekleyen, düzenleyen ve ayarları yöneten kişi.</div>
-      <label class="f">Aile şifresi</label>
-      <input class="i" id="wSifre" type="password" placeholder="Eşinle paylaşacağın ortak şifre" autocomplete="new-password">
-      <div id="wToken"><label class="f">GitHub anahtarı (token) — yalnız yönetici</label>
-      <input class="i" id="wTok" type="password" placeholder="github_pat_…  (sonra da girebilirsin)"></div>
-      <details class="ac" style="margin-top:8px"><summary class="small">Depo bilgisi</summary>
-        <div class="row2"><div><label class="f">GitHub kullanıcı</label><input class="i" id="wOwner" value="${esc(r.owner)}"></div>
-        <div><label class="f">Depo</label><input class="i" id="wRepo" value="${esc(r.repo)}"></div></div>
-      </details>
-      <div class="btns"><button class="btn" onclick="baslat()">Başla</button></div>
-      <p class="small muted" style="margin:12px 0 0">Şifreyi boş bırakırsan Armut yalnızca bu cihazda çalışır.</p>
-    </div>
-  </div>`;
-}
-let wRol = 'admin';
-function rolSec(r){ wRol = r; document.querySelectorAll('#rolSeg button').forEach(b => b.classList.toggle('on', b.dataset.r === r));
-  $('#wToken').style.display = r === 'admin' ? '' : 'none';
-  $('#rolAcik').textContent = r === 'admin' ? 'Kayıt ekleyen, düzenleyen ve ayarları yöneten kişi.' : 'Tüm ekranları görür, raporları indirir; kayıt değiştiremez.'; }
-async function baslat(){
-  cfg = {rol: wRol, sifre: $('#wSifre').value.trim(), token: wRol==='admin' ? $('#wTok').value.trim() : '', owner: $('#wOwner').value.trim(), repo: $('#wRepo').value.trim()};
-  if (wRol === 'izleyici' && !syncAktif()){ toast('İzleyici olarak girmek için aile şifresi ve depo bilgisi gerekli.'); return; }
-  saveCfg();
-  if (!db) db = bosDB();
-  saveLocal(); render();
-  if (syncAktif()) await esitle();
+  sheet(`<h2>🔑 Yönetici girişi</h2>
+    <p class="small muted" style="margin-top:0">Kayıt ekleyip değiştirebilmek için GitHub anahtarını (token) gir. Anahtar yalnız bu cihazda saklanır.</p>
+    <label class="f">GitHub anahtarı (token)</label><input class="i" id="yT" type="password" placeholder="github_pat_…" value="${esc(cfg.token||'')}">
+    <details class="ac" style="margin-top:8px"><summary class="small">Depo bilgisi</summary>
+      <div class="row2"><div><label class="f">GitHub kullanıcı</label><input class="i" id="yO" value="${esc(cfg.owner||r.owner)}"></div>
+      <div><label class="f">Depo</label><input class="i" id="yR" value="${esc(cfg.repo||r.repo)}"></div></div></details>
+    <div class="btns">${isAdmin()?'<button class="btn red" id="yC">İzleyiciye dön</button>':'<button class="btn ghost" onclick="kapat()">Vazgeç</button>'}<button class="btn" id="yK">Kaydet</button></div>`);
+  if ($('#yC')) $('#yC').onclick = () => { cfg.rol = 'izleyici'; cfg.token = ''; saveCfg(); kapat(); render(); esitle(true); };
+  $('#yK').onclick = async () => { const t = $('#yT').value.trim(); if (!t) return toast('Token gir');
+    cfg = {...cfg, rol:'admin', token:t, owner:$('#yO').value.trim(), repo:$('#yR').value.trim()}; sha = null; saveCfg(); kapat(); render(); await esitle(); };
 }
 
 /* ---------- ANA SAYFA ---------- */
@@ -659,9 +608,9 @@ function ayarSayfa(){
   return `
   <div class="card"><h3>Hesap</h3>
     <div class="kv"><span>Rol</span><span class="badge">${ad ? 'Yönetici' : 'İzleyici'}</span></div>
-    <div class="kv"><span>Paylaşım</span><b class="small">${syncAktif() ? '🔒 '+esc(cfg.owner)+'/'+esc(cfg.repo) : 'Kapalı (yalnız bu cihaz)'}</b></div>
+    <div class="kv"><span>Veri</span><b class="small">${syncAktif() ? esc(cfg.owner)+'/'+esc(cfg.repo) : 'Yalnız bu cihaz'}</b></div>
     ${cfg.sonSync ? `<div class="kv"><span>Son eşitleme</span><span class="small">${new Date(cfg.sonSync).toLocaleString('tr-TR')}</span></div>` : ''}
-    <div class="btns"><button class="btn ghost" onclick="paylasimFormu()">Paylaşım ayarları</button>${syncAktif()?'<button class="btn" onclick="esitle()">Şimdi eşitle</button>':''}</div>
+    <div class="btns">${syncAktif()?'<button class="btn" onclick="esitle()">Şimdi eşitle</button>':''}</div>
   </div>
   <div class="card"><h3>Genel</h3>
     <label class="f">Aylık bütçe hedefi (₺, 0 = kapalı)</label><input class="i" ${dis} inputmode="decimal" value="${a.butce?nf2.format(a.butce):''}" onchange="db.ayar.butce=parseAmt(this.value)||0;db.ayar.u=now();degisti()">
@@ -684,7 +633,7 @@ function ayarSayfa(){
     <button class="btn ghost" onclick="yedekIndir()">💾 Yedek indir (.json)</button>
     <p class="small muted" style="margin:8px 0 0">Yedek dosyası şifresizdir; güvenli bir yerde (ör. Drive) sakla.</p>
   </div>
-  <div class="card"><button class="btn red" onclick="if(confirm('Bu cihazdaki Armut oturumu kapatılsın mı? (Paylaşılan veri silinmez)')){localStorage.removeItem('${LS_CFG}');${ad?'':`localStorage.removeItem('${LS_DB}');`}location.reload()}">Oturumu kapat</button>
+  <div class="card"><button class="btn ghost" onclick="yoneticiFormu()">🔑 ${ad ? 'Yönetici ayarları' : 'Yönetici girişi'}</button>
   <p class="small muted" style="text-align:center;margin:10px 0 0">Armut v${VER}</p></div>`;
 }
 function listeDuzen(tip){
@@ -705,19 +654,6 @@ function listeDuzen(tip){
 }
 function yeniKat(tur){ const ad = prompt('Kategori adı:'); if (!ad) return; const ikon = prompt('Simge (emoji):', tur==='gider'?'🏷️':'💵') || '🏷️';
   upsert('kategoriler', {id: 'k' + uid(), ad, ikon, tur}); degisti(); }
-function paylasimFormu(){
-  sheet(`<h2>🔒 Paylaşım</h2>
-    <p class="small muted" style="margin-top:0">Veriler GitHub deponda <b>aile şifresiyle şifreli</b> bir dosyada tutulur. Şifreyi bilmeyen hiçbir şey okuyamaz.</p>
-    <div class="row2"><div><label class="f">GitHub kullanıcı</label><input class="i" id="pO" value="${esc(cfg.owner||varsayilanRepo().owner)}"></div>
-    <div><label class="f">Depo</label><input class="i" id="pR" value="${esc(cfg.repo||varsayilanRepo().repo)}"></div></div>
-    <label class="f">Aile şifresi</label><input class="i" id="pS" type="password" value="${esc(cfg.sifre||'')}" autocomplete="new-password">
-    ${isAdmin() ? `<label class="f">GitHub anahtarı (fine-grained token, yalnız armut deposu · Contents: Read and write)</label><input class="i" id="pT" type="password" value="${esc(cfg.token||'')}">` : ''}
-    <p class="small muted">Eşinin telefonunda: uygulamayı aç → <b>Aile üyesi (izleyici)</b> → aynı aile şifresi.</p>
-    <div class="btns"><button class="btn ghost" onclick="kapat()">Vazgeç</button><button class="btn" id="pK">Kaydet ve eşitle</button></div>`);
-  $('#pK').onclick = async () => { cfg.owner = $('#pO').value.trim(); cfg.repo = $('#pR').value.trim(); cfg.sifre = $('#pS').value.trim(); if (isAdmin()) cfg.token = $('#pT').value.trim();
-    sha = null; saveCfg(); kapat(); render(); if (syncAktif()) await esitle(); };
-}
-
 /* ---------- ekstreden yapıştır ---------- */
 let ekstre = [];
 function ekstreFormu(){
